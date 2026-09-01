@@ -3,7 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import '../models/centre.dart';
 import '../models/slot.dart';
-import '../services/mock_data_service.dart';
+import '../models/booking.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
@@ -22,15 +23,17 @@ class SlotBookingScreen extends StatefulWidget {
 
 class _SlotBookingScreenState extends State<SlotBookingScreen> {
   final _formKey = GlobalKey<FormState>();
-  final MockDataService _dataService = MockDataService();
 
   late ProcurementCentre _centre;
   late DateTime _selectedDate;
-  String _selectedSlotId = 'slot_2'; // 10:00 AM – 11:00 AM default
+  int? _selectedSlotId;
   late String _selectedCrop;
   late TextEditingController _quantityController;
   late TextEditingController _vehicleController;
   bool _isLoading = false;
+  bool _isSlotsLoading = true;
+  String? _slotsError;
+  List<TimeSlot> _slots = [];
 
   final List<String> _crops = [
     'Paddy',
@@ -44,14 +47,41 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   @override
   void initState() {
     super.initState();
-    final farmer = _dataService.currentFarmer;
-    _centre = widget.selectedCentre ?? _dataService.centres[1]; // Default to Centre B (Recommended)
+    _centre = widget.selectedCentre ?? ProcurementCentre.getMockCentres()[1];
     _selectedDate = DateTime(2026, 8, 25);
-    _selectedCrop = farmer.crop.isNotEmpty ? farmer.crop : 'Paddy';
-    _quantityController = TextEditingController(
-      text: farmer.expectedQuantity > 0 ? farmer.expectedQuantity.toStringAsFixed(0) : '850',
-    );
+    _selectedCrop = 'Paddy';
+    _quantityController = TextEditingController(text: '850');
     _vehicleController = TextEditingController(text: 'TN 01 AB 1234');
+
+    _loadSlots();
+  }
+
+  Future<void> _loadSlots() async {
+    setState(() {
+      _isSlotsLoading = true;
+      _slotsError = null;
+    });
+
+    try {
+      final dateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      final data = await ApiService.getSlots(_centre.id, dateStr);
+      _slots = data.map((json) => TimeSlot.fromJson(json)).toList();
+
+      // Auto-select first available slot
+      _selectedSlotId = null;
+      for (final slot in _slots) {
+        if (slot.isAvailable) {
+          _selectedSlotId = slot.id;
+          break;
+        }
+      }
+
+      if (mounted) setState(() => _isSlotsLoading = false);
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isSlotsLoading = false; _slotsError = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isSlotsLoading = false; _slotsError = 'Unable to load slots.'; });
+    }
   }
 
   @override
@@ -61,34 +91,59 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
     super.dispose();
   }
 
-  void _handleConfirmBooking() {
+  Future<void> _handleConfirmBooking() async {
     if (_formKey.currentState!.validate()) {
+      if (_selectedSlotId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please select a time slot.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+
       setState(() => _isLoading = true);
 
-      final selectedSlot = _dataService.timeSlots.firstWhere(
-        (s) => s.id == _selectedSlotId,
-        orElse: () => _dataService.timeSlots[1],
-      );
+      try {
+        final data = await ApiService.createBooking(
+          centreId: _centre.id,
+          slotId: _selectedSlotId!,
+          crop: _selectedCrop,
+          expectedQuantity: double.tryParse(_quantityController.text.trim()) ?? 850.0,
+          vehicleNumber: _vehicleController.text.trim().toUpperCase(),
+        );
 
-      Future.delayed(const Duration(milliseconds: 700), () {
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        final newBooking = _dataService.createBooking(
-          centre: _centre,
-          date: DateFormat('dd MMMM yyyy').format(_selectedDate),
-          timeRange: selectedSlot.timeRange,
-          crop: _selectedCrop,
-          quantityKg: double.tryParse(_quantityController.text.trim()) ?? 850.0,
-          vehicleNumber: _vehicleController.text.trim().toUpperCase(),
-        );
+        final newBooking = BookingModel.fromCreateResponse(data);
 
         Navigator.pushReplacementNamed(
           context,
           AppRoutes.confirmation,
           arguments: newBooking,
         );
-      });
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Booking failed: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -113,13 +168,12 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
     );
     if (picked != null) {
       setState(() => _selectedDate = picked);
+      _loadSlots(); // Reload slots for new date
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final slots = _dataService.timeSlots;
-
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -279,24 +333,59 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Grid of Time Slots
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 2.1,
+                // Grid of Time Slots — from API
+                if (_isSlotsLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          CircularProgressIndicator(color: AppColors.primary),
+                          SizedBox(height: 12),
+                          Text('Loading slots...', style: TextStyle(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_slotsError != null)
+                  Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.textMuted),
+                          const SizedBox(height: 12),
+                          Text(_slotsError!, style: const TextStyle(color: AppColors.textSecondary)),
+                          const SizedBox(height: 12),
+                          ElevatedButton(onPressed: _loadSlots, child: const Text('TRY AGAIN')),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (_slots.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(
+                      child: Text('No available slots for this date.', style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                  )
+                else
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 2.1,
+                    ),
+                    itemCount: _slots.length,
+                    itemBuilder: (context, index) {
+                      final slot = _slots[index];
+                      final isSelected = _selectedSlotId == slot.id;
+                      return _buildSlotCard(slot, isSelected: isSelected);
+                    },
                   ),
-                  itemCount: slots.length,
-                  itemBuilder: (context, index) {
-                    final slot = slots[index];
-                    final isSelected = _selectedSlotId == slot.id;
-
-                    return _buildSlotCard(slot, isSelected: isSelected);
-                  },
-                ),
                 const SizedBox(height: 24),
 
                 // Produce and Vehicle Details Form
@@ -313,7 +402,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
                 // Crop Dropdown
                 _buildFieldLabel('Crop'),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCrop,
+                  value: _selectedCrop,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.grass_rounded),
                   ),
@@ -445,14 +534,16 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  isAvailable ? 'Available' : 'Full',
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: !isAvailable
-                        ? AppColors.error
-                        : (isSelected ? Colors.white70 : AppColors.success),
+                Flexible(
+                  child: Text(
+                    isAvailable ? '${slot.availableCount} left' : 'Full',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: !isAvailable
+                          ? AppColors.error
+                          : (isSelected ? Colors.white70 : AppColors.success),
+                    ),
                   ),
                 ),
                 if (isSelected)

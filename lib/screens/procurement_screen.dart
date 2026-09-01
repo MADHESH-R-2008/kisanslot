@@ -1,66 +1,154 @@
 import 'package:flutter/material.dart';
 import '../models/booking.dart';
-import '../services/mock_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/status_card.dart';
 
-class ProcurementScreen extends StatelessWidget {
+class ProcurementScreen extends StatefulWidget {
   const ProcurementScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final booking = MockDataService().activeBooking ?? BookingModel.mockBooking();
+  State<ProcurementScreen> createState() => _ProcurementScreenState();
+}
 
-    final List<TimelineStepData> procurementSteps = [
-      const TimelineStepData(
+class _ProcurementScreenState extends State<ProcurementScreen> {
+  bool _isLoading = true;
+  String? _error;
+  BookingModel? _booking;
+  Map<String, dynamic>? _procurementData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() { _isLoading = true; _error = null; });
+
+    try {
+      final bookingId = await ApiService.getActiveBookingId();
+      if (bookingId == null || bookingId.isEmpty) {
+        if (mounted) setState(() { _isLoading = false; _error = 'No active booking found.'; });
+        return;
+      }
+
+      final bookingData = await ApiService.getBooking(bookingId);
+      _booking = BookingModel.fromJson(bookingData);
+
+      _procurementData = await ApiService.getProcurement(bookingId);
+
+      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Unable to load procurement data.'; });
+    }
+  }
+
+  int _getStepFromStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDING': return 0;
+      case 'QUALITY_CHECK': return 2;
+      case 'WEIGHING': return 3;
+      case 'COMPLETED': return 6;
+      default: return 0;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Procurement Status')),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    if (_error != null || _booking == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Procurement Status'),
+          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.grass_outlined, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_error ?? 'No active booking.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(onPressed: _loadData, icon: const Icon(Icons.refresh), label: const Text('TRY AGAIN')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final booking = _booking!;
+    final procStatus = _procurementData?['status'] ?? 'PENDING';
+    final currentStep = _getStepFromStatus(procStatus);
+    final rate = (_procurementData?['rate'] ?? booking.ratePerKg).toDouble();
+    final totalAmount = (_procurementData?['total_amount'] ?? (booking.quantityKg * rate)).toDouble();
+    final actualWeight = _procurementData?['actual_weight'];
+    final qualityStatus = _procurementData?['quality_status'] ?? 'PENDING';
+
+    List<TimelineStepData> procurementSteps = [
+      TimelineStepData(
         title: 'Booking Confirmed',
-        description: 'Slot successfully booked for 25 Aug at 10:00 AM',
-        time: '09:30 AM',
-        state: TimelineStepStatus.completed,
+        description: 'Slot booked for ${booking.date}',
+        time: 'Done',
+        state: currentStep >= 0 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.check_circle_outline,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Farmer Verified',
-        description: 'Farmer ID (FR10245) & Aadhaar biometric verification passed',
-        time: '10:05 AM',
-        state: TimelineStepStatus.completed,
+        description: 'Farmer ID (${booking.bookingId}) verified',
+        time: currentStep >= 1 ? 'Done' : 'Pending',
+        state: currentStep >= 1 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.verified_user_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Quality Check',
-        description: 'Moisture content 13.8% • Grade A standard approved',
-        time: '10:20 AM',
-        state: TimelineStepStatus.completed,
+        description: qualityStatus == 'PENDING' ? 'Awaiting quality inspection' : 'Quality: $qualityStatus',
+        time: currentStep >= 2 ? 'Done' : (currentStep == 2 ? 'In Progress' : 'Pending'),
+        state: currentStep > 2 ? TimelineStepStatus.completed : (currentStep == 2 ? TimelineStepStatus.current : TimelineStepStatus.pending),
         icon: Icons.fact_check_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Weighing',
-        description: 'Gross weight measurement in progress at Weighbridge 2',
-        time: 'In Progress',
-        state: TimelineStepStatus.current,
+        description: actualWeight != null ? 'Actual weight: ${actualWeight.toStringAsFixed(1)} kg' : 'Weight measurement in progress',
+        time: currentStep >= 3 ? (currentStep > 3 ? 'Done' : 'In Progress') : 'Pending',
+        state: currentStep > 3 ? TimelineStepStatus.completed : (currentStep == 3 ? TimelineStepStatus.current : TimelineStepStatus.pending),
         icon: Icons.scale_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Procurement Finalized',
-        description: 'Issuance of official Mandi J-Form receipt',
-        time: 'Upcoming',
-        state: TimelineStepStatus.pending,
+        description: 'Official Mandi receipt issuance',
+        time: currentStep >= 4 ? 'Done' : 'Upcoming',
+        state: currentStep >= 4 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.receipt_long_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Payment Processing',
-        description: 'Direct Benefit Transfer (DBT) initiation to bank account',
-        time: 'Pending',
-        state: TimelineStepStatus.pending,
+        description: 'Direct Benefit Transfer (DBT) to bank account',
+        time: currentStep >= 5 ? 'Done' : 'Pending',
+        state: currentStep >= 5 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.account_balance_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Payment Completed',
-        description: 'Amount credited via PFMS / Aadhaar enabled payment',
-        time: 'Pending',
-        state: TimelineStepStatus.pending,
+        description: 'Amount credited via PFMS',
+        time: currentStep >= 6 ? 'Done' : 'Pending',
+        state: currentStep >= 6 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.payments_outlined,
       ),
     ];
@@ -122,14 +210,14 @@ class ProcurementScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.sync, size: 14, color: AppColors.warning),
-                          SizedBox(width: 4),
+                          const Icon(Icons.sync, size: 14, color: AppColors.warning),
+                          const SizedBox(width: 4),
                           Text(
-                            '🟡 Step 4 of 7',
-                            style: TextStyle(
+                            '🟡 Step ${currentStep + 1} of 7',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: AppColors.warning,
@@ -147,9 +235,9 @@ class ProcurementScreen extends StatelessWidget {
               ProduceSummaryCard(
                 crop: booking.crop,
                 expectedQuantity: booking.quantityKg,
-                actualWeightText: 'Pending (Weighing)',
-                ratePerKg: booking.ratePerKg,
-                totalAmount: booking.totalAmount,
+                actualWeightText: actualWeight != null ? '${actualWeight.toStringAsFixed(1)} kg' : 'Pending (Weighing)',
+                ratePerKg: rate,
+                totalAmount: totalAmount,
               ),
               const SizedBox(height: 18),
 

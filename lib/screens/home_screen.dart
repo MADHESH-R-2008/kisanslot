@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/mock_data_service.dart';
+import '../models/farmer.dart';
+import '../models/booking.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/booking_card.dart';
@@ -13,22 +15,64 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  final MockDataService _dataService = MockDataService();
+  FarmerModel? _farmer;
+  BookingModel? _activeBooking;
+  bool _isLoading = true;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _dataService.addListener(_onStateChange);
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _dataService.removeListener(_onStateChange);
-    super.dispose();
-  }
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
 
-  void _onStateChange() {
-    if (mounted) setState(() {});
+    try {
+      // Load farmer profile
+      final profileData = await ApiService.getProfile();
+      _farmer = FarmerModel.fromJson(profileData);
+
+      // Try loading active booking
+      try {
+        final bookingId = await ApiService.getActiveBookingId();
+        if (bookingId != null && bookingId.isNotEmpty) {
+          final bookingData = await ApiService.getBooking(bookingId);
+          _activeBooking = BookingModel.fromJson(bookingData);
+
+          // Load queue data to update position
+          try {
+            final queueData = await ApiService.getQueue(bookingId);
+            _activeBooking = _activeBooking!.copyWith(
+              queuePosition: queueData['queue_position'] ?? 0,
+              farmersAhead: queueData['farmers_ahead'] ?? 0,
+              waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
+            );
+          } catch (_) {}
+        }
+      } catch (_) {
+        // No active booking, that's fine
+        _activeBooking = null;
+      }
+
+      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        // Token expired
+        await ApiService.clearToken();
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
+        }
+        return;
+      }
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Unable to connect to server.'; });
+    }
   }
 
   void _onBottomNavTapped(int index) {
@@ -40,7 +84,10 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 1:
         Navigator.pushNamed(context, AppRoutes.centre).then((_) {
-          if (mounted) setState(() => _currentIndex = 0);
+          if (mounted) {
+            setState(() => _currentIndex = 0);
+            _loadData(); // Refresh on return
+          }
         });
         break;
       case 2:
@@ -50,7 +97,10 @@ class _HomeScreenState extends State<HomeScreen> {
         break;
       case 3:
         Navigator.pushNamed(context, AppRoutes.profile).then((_) {
-          if (mounted) setState(() => _currentIndex = 0);
+          if (mounted) {
+            setState(() => _currentIndex = 0);
+            _loadData();
+          }
         });
         break;
     }
@@ -58,8 +108,49 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final farmer = _dataService.currentFarmer;
-    final booking = _dataService.activeBooking;
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primary),
+              SizedBox(height: 16),
+              Text('Loading dashboard...', style: TextStyle(color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off_rounded, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('TRY AGAIN'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final farmer = _farmer ?? FarmerModel.mockFarmer();
+    final booking = _activeBooking;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -169,8 +260,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         Expanded(
                           child: _buildQuickStatItem(
                             title: 'Upcoming Slot',
-                            value: booking != null ? '25 Aug' : 'No Slot',
-                            subValue: booking?.timeRange.split('–').first.trim() ?? '--',
+                            value: booking != null ? booking.date : 'No Slot',
+                            subValue: booking != null ? booking.timeRange.split('–').first.trim().split(' - ').first.trim() : '--',
                           ),
                         ),
                         Container(width: 1, height: 38, color: Colors.white24),
@@ -288,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Payment Status',
                 subtitle: 'Track your payment & bank transfer',
                 emoji: '💰',
-                badgeText: '₹18,275',
+                badgeText: booking != null ? '₹${(booking.quantityKg * booking.ratePerKg).toStringAsFixed(0)}' : null,
                 accentColor: const Color(0xFF7C3AED),
                 onTap: () => Navigator.pushNamed(context, AppRoutes.payment),
               ),
@@ -357,6 +448,8 @@ class _HomeScreenState extends State<HomeScreen> {
             fontSize: 16,
             fontWeight: FontWeight.w900,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 2),
         Text(

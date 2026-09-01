@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/mock_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
@@ -26,29 +26,51 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      Future.delayed(const Duration(milliseconds: 600), () {
+      try {
+        final data = await ApiService.login(
+          mobile: _mobileController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
+
         if (!mounted) return;
         setState(() => _isLoading = false);
 
-        MockDataService().login(
-          _mobileController.text.trim(),
-          _passwordController.text.trim(),
-        );
+        final farmerName = data['farmer']?['name'] ?? 'Farmer';
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Welcome back, Ravi Kumar!'),
+          SnackBar(
+            content: Text('Welcome back, $farmerName!'),
             backgroundColor: AppColors.success,
-            duration: Duration(seconds: 2),
+            duration: const Duration(seconds: 2),
           ),
         );
 
         Navigator.pushReplacementNamed(context, AppRoutes.home);
-      });
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection error. Is the backend running?\n$e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 

@@ -1,4 +1,5 @@
 class FarmerModel {
+  final int? id;
   final String name;
   final String farmerId;
   final String mobile;
@@ -9,6 +10,7 @@ class FarmerModel {
   final double expectedQuantity;
 
   const FarmerModel({
+    this.id,
     required this.name,
     required this.farmerId,
     required this.mobile,
@@ -19,7 +21,34 @@ class FarmerModel {
     required this.expectedQuantity,
   });
 
+  factory FarmerModel.fromJson(Map<String, dynamic> json) {
+    return FarmerModel(
+      id: json['id'],
+      name: json['name'] ?? '',
+      farmerId: json['farmer_id'] ?? '',
+      mobile: json['mobile'] ?? '',
+      village: json['village'] ?? '',
+      district: json['district'] ?? '',
+      state: json['state'] ?? '',
+      crop: json['crop'] ?? '',
+      expectedQuantity: (json['expected_quantity'] ?? 0).toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (id != null) 'id': id,
+    'name': name,
+    'farmer_id': farmerId,
+    'mobile': mobile,
+    'village': village,
+    'district': district,
+    'state': state,
+    'crop': crop,
+    'expected_quantity': expectedQuantity,
+  };
+
   FarmerModel copyWith({
+    int? id,
     String? name,
     String? farmerId,
     String? mobile,
@@ -30,6 +59,7 @@ class FarmerModel {
     double? expectedQuantity,
   }) {
     return FarmerModel(
+      id: id ?? this.id,
       name: name ?? this.name,
       farmerId: farmerId ?? this.farmerId,
       mobile: mobile ?? this.mobile,

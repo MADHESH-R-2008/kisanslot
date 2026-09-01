@@ -1,45 +1,134 @@
 import 'package:flutter/material.dart';
 import '../models/booking.dart';
-import '../services/mock_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/status_card.dart';
 
-class PaymentScreen extends StatelessWidget {
+class PaymentScreen extends StatefulWidget {
   const PaymentScreen({super.key});
 
   @override
+  State<PaymentScreen> createState() => _PaymentScreenState();
+}
+
+class _PaymentScreenState extends State<PaymentScreen> {
+  bool _isLoading = true;
+  String? _error;
+  BookingModel? _booking;
+  Map<String, dynamic>? _paymentData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() { _isLoading = true; _error = null; });
+
+    try {
+      final bookingId = await ApiService.getActiveBookingId();
+      if (bookingId == null || bookingId.isEmpty) {
+        if (mounted) setState(() { _isLoading = false; _error = 'No active booking found.'; });
+        return;
+      }
+
+      final bookingData = await ApiService.getBooking(bookingId);
+      _booking = BookingModel.fromJson(bookingData);
+
+      _paymentData = await ApiService.getPayment(bookingId);
+
+      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Unable to load payment data.'; });
+    }
+  }
+
+  int _getStepFromStatus(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDING': return 0;
+      case 'PROCESSING': return 2;
+      case 'COMPLETED': return 4;
+      case 'FAILED': return 0;
+      default: return 0;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final booking = MockDataService().activeBooking ?? BookingModel.mockBooking();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Payment Status')),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    if (_error != null || _booking == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Payment Status'),
+          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.account_balance_wallet_outlined, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_error ?? 'No payment info.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(onPressed: _loadData, icon: const Icon(Icons.refresh), label: const Text('TRY AGAIN')),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final booking = _booking!;
+    final payStatus = _paymentData?['status'] ?? 'PENDING';
+    final currentStep = _getStepFromStatus(payStatus);
+    
+    final rate = booking.ratePerKg;
+    final qty = booking.quantityKg;
+    final totalAmount = (_paymentData?['amount'] ?? (qty * rate)).toDouble();
+    final transactionId = _paymentData?['transaction_id'];
 
     final List<TimelineStepData> paymentTimelineSteps = [
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Procurement Completed',
-        description: 'Mandi J-Form generated and produce safely stored',
-        time: '25 Aug, 11:30 AM',
-        state: TimelineStepStatus.completed,
+        description: 'Mandi J-Form generated',
+        time: 'Done',
+        state: currentStep >= 0 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.check_circle_outline,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Payment Initiated',
-        description: 'Payment voucher created by APMC procurement officer',
-        time: '25 Aug, 02:15 PM',
-        state: TimelineStepStatus.completed,
+        description: 'Payment voucher created',
+        time: currentStep >= 1 ? 'Done' : 'Pending',
+        state: currentStep >= 1 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.send_outlined,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Payment Processing',
-        description: 'Direct Benefit Transfer (DBT) clearance through PFMS',
-        time: 'In Progress',
-        state: TimelineStepStatus.current,
+        description: 'Direct Benefit Transfer (DBT) clearance',
+        time: currentStep >= 2 ? 'Done' : (currentStep == 2 ? 'In Progress' : 'Pending'),
+        state: currentStep > 2 ? TimelineStepStatus.completed : (currentStep == 2 ? TimelineStepStatus.current : TimelineStepStatus.pending),
         icon: Icons.sync,
       ),
-      const TimelineStepData(
+      TimelineStepData(
         title: 'Payment Completed',
-        description: 'Credit notification will be sent to registered mobile',
-        time: 'Exp. 27 Aug 2026',
-        state: TimelineStepStatus.pending,
+        description: transactionId != null ? 'Txn: $transactionId' : 'Credit notification will be sent',
+        time: currentStep >= 4 ? 'Done' : 'Expected soon',
+        state: currentStep >= 4 ? TimelineStepStatus.completed : TimelineStepStatus.pending,
         icon: Icons.account_balance_wallet_outlined,
       ),
     ];
@@ -100,14 +189,14 @@ class PaymentScreen extends StatelessWidget {
                             color: Colors.white.withValues(alpha: 0.25),
                             borderRadius: BorderRadius.circular(20),
                           ),
-                          child: const Row(
+                          child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.hourglass_top_rounded, size: 14, color: Colors.white),
-                              SizedBox(width: 4),
+                              Icon(payStatus == 'COMPLETED' ? Icons.check_circle : Icons.hourglass_top_rounded, size: 14, color: Colors.white),
+                              const SizedBox(width: 4),
                               Text(
-                                '🟡 Processing',
-                                style: TextStyle(
+                                payStatus == 'COMPLETED' ? 'Completed' : 'Processing',
+                                style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -119,9 +208,9 @@ class PaymentScreen extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    const Text(
-                      '₹18,275',
-                      style: TextStyle(
+                    Text(
+                      '₹${totalAmount.toStringAsFixed(0)}',
+                      style: const TextStyle(
                         fontSize: 38,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
@@ -212,15 +301,15 @@ class PaymentScreen extends StatelessWidget {
                     const SizedBox(height: 14),
                     _buildRow('Crop', booking.crop),
                     const Divider(height: 18, color: AppColors.cardBorder),
-                    _buildRow('Quantity', '${booking.quantityKg.toStringAsFixed(0)} kg'),
+                    _buildRow('Quantity', '${qty.toStringAsFixed(0)} kg'),
                     const Divider(height: 18, color: AppColors.cardBorder),
-                    _buildRow('Rate per kg', '₹${booking.ratePerKg.toStringAsFixed(2)} / kg'),
+                    _buildRow('Rate per kg', '₹${rate.toStringAsFixed(2)} / kg'),
                     const Divider(height: 18, color: AppColors.cardBorder),
-                    _buildRow('Gross Payable', '₹18,275.00', isBold: true),
+                    _buildRow('Gross Payable', '₹${totalAmount.toStringAsFixed(2)}', isBold: true),
                     const Divider(height: 18, color: AppColors.cardBorder),
                     _buildRow('Mandi Charges / Deductions', '₹0.00 (100% Free)'),
                     const Divider(height: 18, color: AppColors.cardBorder),
-                    _buildRow('Net Payable (DBT)', '₹18,275.00', isBold: true, isHighlight: true),
+                    _buildRow('Net Payable (DBT)', '₹${totalAmount.toStringAsFixed(2)}', isBold: true, isHighlight: true),
                   ],
                 ),
               ),

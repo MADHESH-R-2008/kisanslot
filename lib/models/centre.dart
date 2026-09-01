@@ -1,5 +1,5 @@
 class ProcurementCentre {
-  final String id;
+  final int id;
   final String name;
   final double distanceKm;
   final int queueCount;
@@ -23,10 +23,26 @@ class ProcurementCentre {
     this.rating = 4.8,
   });
 
+  factory ProcurementCentre.fromJson(Map<String, dynamic> json) {
+    final qCount = json['queue_count'] ?? 0;
+    return ProcurementCentre(
+      id: json['id'],
+      name: json['name'] ?? '',
+      distanceKm: (json['distance_km'] ?? json['distance'] ?? 0).toDouble(),
+      queueCount: qCount,
+      waitMin: json['estimated_wait_minutes'] ?? 0,
+      isRecommended: qCount <= 10,  // Auto-recommend if queue is short
+      address: json['address'] ?? '',
+      isOpen: json['is_active'] ?? true,
+      activeCounters: json['active_counters'] ?? 3,
+      rating: (json['rating'] ?? 4.5).toDouble(),
+    );
+  }
+
   static List<ProcurementCentre> getMockCentres() {
     return const [
       ProcurementCentre(
-        id: 'centre_a',
+        id: 1,
         name: 'Centre A',
         distanceKm: 4.0,
         queueCount: 28,
@@ -38,7 +54,7 @@ class ProcurementCentre {
         rating: 4.2,
       ),
       ProcurementCentre(
-        id: 'centre_b',
+        id: 2,
         name: 'Centre B',
         distanceKm: 7.0,
         queueCount: 8,
@@ -50,7 +66,7 @@ class ProcurementCentre {
         rating: 4.9,
       ),
       ProcurementCentre(
-        id: 'centre_c',
+        id: 3,
         name: 'Centre C',
         distanceKm: 10.0,
         queueCount: 15,

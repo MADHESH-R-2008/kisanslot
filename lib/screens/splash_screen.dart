@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 
@@ -14,7 +15,6 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
-  Timer? _timer;
 
   @override
   void initState() {
@@ -34,16 +34,41 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
 
     _controller.forward();
 
-    _timer = Timer(const Duration(milliseconds: 2200), () {
-      if (mounted) {
-        Navigator.pushReplacementNamed(context, AppRoutes.login);
+    // Check for stored JWT token to decide navigation
+    _checkAuthAndNavigate();
+  }
+
+  Future<void> _checkAuthAndNavigate() async {
+    // Wait for animation to play
+    await Future.delayed(const Duration(milliseconds: 2200));
+    if (!mounted) return;
+
+    try {
+      final hasToken = await ApiService.hasToken();
+      if (hasToken) {
+        // Verify the token is still valid by calling profile
+        try {
+          await ApiService.getProfile();
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+          }
+          return;
+        } catch (_) {
+          // Token expired or invalid, clear it
+          await ApiService.clearToken();
+        }
       }
-    });
+    } catch (_) {
+      // If any error, just go to login
+    }
+
+    if (mounted) {
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    }
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
     _controller.dispose();
     super.dispose();
   }

@@ -17,7 +17,7 @@ enum PaymentStatus {
 class BookingModel {
   final String bookingId;
   final int tokenNumber;
-  final String centreId;
+  final int centreId;
   final String centreName;
   final String date;
   final String timeRange;
@@ -59,10 +59,75 @@ class BookingModel {
     this.bankAccountHint = 'SBI •••• 4921',
   });
 
+  /// Create from booking detail API response
+  factory BookingModel.fromJson(Map<String, dynamic> json) {
+    final statusStr = (json['status'] ?? 'CONFIRMED').toString().toUpperCase();
+    BookingStatus bookingStatus;
+    switch (statusStr) {
+      case 'CONFIRMED':
+        bookingStatus = BookingStatus.confirmed;
+        break;
+      case 'ARRIVED':
+        bookingStatus = BookingStatus.inQueue;
+        break;
+      case 'VERIFIED':
+        bookingStatus = BookingStatus.atCounter;
+        break;
+      case 'PROCESSING':
+        bookingStatus = BookingStatus.procuring;
+        break;
+      case 'COMPLETED':
+        bookingStatus = BookingStatus.completed;
+        break;
+      case 'CANCELLED':
+        bookingStatus = BookingStatus.cancelled;
+        break;
+      default:
+        bookingStatus = BookingStatus.confirmed;
+    }
+
+    return BookingModel(
+      bookingId: json['booking_id'] ?? '',
+      tokenNumber: json['token_number'] ?? 0,
+      centreId: json['centre_id'] ?? 0,
+      centreName: json['centre'] ?? '',
+      date: json['date'] ?? '',
+      timeRange: json['time'] ?? '${json['start_time'] ?? ''} - ${json['end_time'] ?? ''}',
+      crop: json['crop'] ?? '',
+      quantityKg: (json['quantity'] ?? json['expected_quantity'] ?? 0).toDouble(),
+      vehicleNumber: json['vehicle_number'] ?? '',
+      queuePosition: json['queue_position'] ?? 0,
+      farmersAhead: json['farmers_ahead'] ?? 0,
+      counterNumber: json['active_counters'] ?? 3,
+      waitTimeMinutes: json['estimated_wait_minutes'] ?? 0,
+      status: bookingStatus,
+    );
+  }
+
+  /// Create from booking creation API response
+  factory BookingModel.fromCreateResponse(Map<String, dynamic> json) {
+    return BookingModel(
+      bookingId: json['booking_id'] ?? '',
+      tokenNumber: json['token_number'] ?? 0,
+      centreId: 0,
+      centreName: json['centre'] ?? '',
+      date: json['date'] ?? '',
+      timeRange: '${json['start_time'] ?? ''} - ${json['end_time'] ?? ''}',
+      crop: json['crop'] ?? '',
+      quantityKg: (json['expected_quantity'] ?? 0).toDouble(),
+      vehicleNumber: json['vehicle_number'] ?? '',
+      queuePosition: json['token_number'] ?? 0,
+      farmersAhead: (json['token_number'] ?? 1) - 1,
+      counterNumber: 3,
+      waitTimeMinutes: 0,
+      status: BookingStatus.confirmed,
+    );
+  }
+
   BookingModel copyWith({
     String? bookingId,
     int? tokenNumber,
-    String? centreId,
+    int? centreId,
     String? centreName,
     String? date,
     String? timeRange,
@@ -109,7 +174,7 @@ class BookingModel {
     return const BookingModel(
       bookingId: 'KS1025',
       tokenNumber: 17,
-      centreId: 'centre_b',
+      centreId: 2,
       centreName: 'Centre B',
       date: '25 August 2026',
       timeRange: '10:00 AM – 11:00 AM',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/farmer.dart';
-import '../services/mock_data_service.dart';
+import '../models/booking.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/booking_card.dart';
@@ -13,22 +14,42 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final MockDataService _dataService = MockDataService();
+  bool _isLoading = true;
+  String? _error;
+  FarmerModel? _farmer;
+  List<BookingModel> _bookings = [];
 
   @override
   void initState() {
     super.initState();
-    _dataService.addListener(_onStateChange);
+    _loadData();
   }
 
-  @override
-  void dispose() {
-    _dataService.removeListener(_onStateChange);
-    super.dispose();
-  }
+  Future<void> _loadData() async {
+    setState(() { _isLoading = true; _error = null; });
 
-  void _onStateChange() {
-    if (mounted) setState(() {});
+    try {
+      final profileData = await ApiService.getProfile();
+      _farmer = FarmerModel.fromJson(profileData);
+
+      // Attempt to load active booking as a mock "history" since backend only returns active booking right now
+      // In a real app we would call a /bookings/history endpoint
+      try {
+        final bookingId = await ApiService.getActiveBookingId();
+        if (bookingId != null && bookingId.isNotEmpty) {
+          final bookingData = await ApiService.getBooking(bookingId);
+          _bookings = [BookingModel.fromJson(bookingData)];
+        }
+      } catch (_) {
+        _bookings = [];
+      }
+
+      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Unable to load profile data.'; });
+    }
   }
 
   void _showEditProfileDialog(FarmerModel farmer) {
@@ -74,23 +95,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             onPressed: () {
-              _dataService.registerFarmer(
-                name: nameCtrl.text.trim(),
-                mobile: farmer.mobile,
-                farmerId: farmer.farmerId,
-                village: villageCtrl.text.trim(),
-                district: districtCtrl.text.trim(),
-                state: stateCtrl.text.trim(),
-                crop: farmer.crop,
-                expectedQuantity: farmer.expectedQuantity,
-              );
-              Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Profile updated successfully!'),
-                  backgroundColor: AppColors.success,
+                  content: Text('Profile update API endpoint coming soon in Phase 3!'),
+                  backgroundColor: AppColors.primary,
                 ),
               );
+              Navigator.pop(ctx);
             },
             child: const Text('Save'),
           ),
@@ -100,8 +111,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMyBookingsSheet() {
-    final bookings = _dataService.bookingHistory;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -142,15 +151,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 14),
-              if (bookings.isEmpty)
+              if (_bookings.isEmpty)
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: Text('No bookings found'),
+                    child: Text('No active bookings found'),
                   ),
                 )
               else
-                ...bookings.map(
+                ..._bookings.map(
                   (b) => Padding(
                     padding: const EdgeInsets.only(bottom: 14),
                     child: BookingCard(
@@ -224,10 +233,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () {
-              Navigator.pop(ctx);
-              _dataService.logout();
-              Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+            onPressed: () async {
+              Navigator.pop(ctx); // Close dialog
+              await ApiService.clearToken();
+              if (mounted) {
+                Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+              }
             },
             child: const Text('Logout'),
           ),
@@ -238,7 +249,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final farmer = _dataService.currentFarmer;
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Farmer Profile')),
+        body: const Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
+    if (_error != null || _farmer == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Farmer Profile'),
+          leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new_rounded), onPressed: () => Navigator.pop(context)),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.person_off_outlined, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_error ?? 'Profile unavailable.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    await ApiService.clearToken();
+                    if (mounted) {
+                      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
+                    }
+                  },
+                  icon: const Icon(Icons.logout),
+                  label: const Text('LOGOUT'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final farmer = _farmer!;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -385,7 +438,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               // App Version & Ministry Badge
               const Center(
                 child: Text(
-                  'KisanSlot v1.0.0 (Phase 1 UI Prototype)\nMinistry of Agriculture & Farmers Welfare',
+                  'KisanSlot v1.0.0 (Phase 2 Backend Integration)\nMinistry of Agriculture & Farmers Welfare',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,

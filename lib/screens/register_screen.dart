@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../services/mock_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
@@ -15,13 +15,15 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  final _nameController = TextEditingController(text: 'Ravi Kumar');
-  final _mobileController = TextEditingController(text: '9876543210');
-  final _farmerIdController = TextEditingController(text: 'FR10245');
-  final _villageController = TextEditingController(text: 'Example Village');
-  final _districtController = TextEditingController(text: 'Example District');
-  final _stateController = TextEditingController(text: 'Tamil Nadu');
+  final _nameController = TextEditingController();
+  final _mobileController = TextEditingController();
+  final _farmerIdController = TextEditingController();
+  final _villageController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _stateController = TextEditingController();
   final _quantityController = TextEditingController(text: '850');
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   final List<String> _crops = [
     'Paddy',
@@ -33,6 +35,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ];
   String _selectedCrop = 'Paddy';
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
   @override
   void dispose() {
@@ -43,27 +47,36 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _districtController.dispose();
     _stateController.dispose();
     _quantityController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleRegister() {
+  Future<void> _handleRegister() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
 
-      Future.delayed(const Duration(milliseconds: 700), () {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
+      try {
+        // Generate farmer ID if not provided
+        String farmerId = _farmerIdController.text.trim();
+        if (farmerId.isEmpty) {
+          farmerId = 'FR${DateTime.now().millisecondsSinceEpoch % 90000 + 10000}';
+        }
 
-        MockDataService().registerFarmer(
+        await ApiService.register(
           name: _nameController.text.trim(),
           mobile: _mobileController.text.trim(),
-          farmerId: _farmerIdController.text.trim(),
+          farmerId: farmerId,
           village: _villageController.text.trim(),
           district: _districtController.text.trim(),
           state: _stateController.text.trim(),
           crop: _selectedCrop,
           expectedQuantity: double.tryParse(_quantityController.text.trim()) ?? 850.0,
+          password: _passwordController.text.trim(),
         );
+
+        if (!mounted) return;
+        setState(() => _isLoading = false);
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -73,7 +86,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
         );
 
         Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false);
-      });
+      } on ApiException catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection error: $e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
     }
   }
 
@@ -233,7 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Crop Dropdown
                 _buildFieldLabel('Primary Crop *'),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCrop,
+                  value: _selectedCrop,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.grass_rounded),
                   ),
@@ -267,6 +300,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (val == null || val.trim().isEmpty) return 'Expected quantity is required';
                     final qty = double.tryParse(val.trim());
                     if (qty == null || qty <= 0) return 'Enter a valid quantity in kg';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Password
+                _buildFieldLabel('Password *'),
+                TextFormField(
+                  controller: _passwordController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    hintText: 'Create a password',
+                    prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Password is required';
+                    if (val.trim().length < 4) return 'Minimum 4 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                // Confirm Password
+                _buildFieldLabel('Confirm Password *'),
+                TextFormField(
+                  controller: _confirmPasswordController,
+                  obscureText: _obscureConfirm,
+                  decoration: InputDecoration(
+                    hintText: 'Re-enter password',
+                    prefixIcon: const Icon(Icons.lock_rounded),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscureConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined),
+                      onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                    ),
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Please confirm password';
+                    if (val.trim() != _passwordController.text.trim()) return 'Passwords do not match';
                     return null;
                   },
                 ),

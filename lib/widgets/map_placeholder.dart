@@ -4,7 +4,7 @@ import '../models/centre.dart';
 
 class MapPlaceholderWidget extends StatelessWidget {
   final List<ProcurementCentre> centres;
-  final String? selectedCentreId;
+  final int? selectedCentreId;
   final Function(ProcurementCentre)? onSelectCentre;
 
   const MapPlaceholderWidget({

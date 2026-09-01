@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/booking.dart';
-import '../services/mock_data_service.dart';
+import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/queue_card.dart';
@@ -13,54 +13,152 @@ class QueueScreen extends StatefulWidget {
 }
 
 class _QueueScreenState extends State<QueueScreen> {
-  final MockDataService _dataService = MockDataService();
   bool _isRefreshing = false;
+  bool _isLoading = true;
+  BookingModel? _booking;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _dataService.addListener(_onStateChange);
+    _loadQueueData();
   }
 
-  @override
-  void dispose() {
-    _dataService.removeListener(_onStateChange);
-    super.dispose();
+  Future<void> _loadQueueData() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    try {
+      final bookingId = await ApiService.getActiveBookingId();
+      if (bookingId == null || bookingId.isEmpty) {
+        if (mounted) setState(() { _isLoading = false; _error = 'No active booking found.'; });
+        return;
+      }
+
+      final bookingData = await ApiService.getBooking(bookingId);
+      _booking = BookingModel.fromJson(bookingData);
+
+      // Load queue position data
+      final queueData = await ApiService.getQueue(bookingId);
+      _booking = _booking!.copyWith(
+        queuePosition: queueData['queue_position'] ?? 0,
+        farmersAhead: queueData['farmers_ahead'] ?? 0,
+        waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
+        counterNumber: queueData['active_counters'] ?? 3,
+      );
+
+      if (mounted) setState(() => _isLoading = false);
+    } on ApiException catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _isLoading = false; _error = 'Unable to load queue data.'; });
+    }
   }
 
-  void _onStateChange() {
-    if (mounted) setState(() {});
-  }
-
-  void _handleRefreshQueue() {
+  Future<void> _handleRefreshQueue() async {
     setState(() => _isRefreshing = true);
 
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (!mounted) return;
-      _dataService.refreshQueue();
-      setState(() => _isRefreshing = false);
+    try {
+      final bookingId = await ApiService.getActiveBookingId();
+      if (bookingId == null) {
+        setState(() => _isRefreshing = false);
+        return;
+      }
 
-      final booking = _dataService.activeBooking;
-      final pos = booking?.queuePosition ?? 17;
-      final isTurn = pos <= 1;
+      final queueData = await ApiService.getQueue(bookingId);
+      final pos = queueData['queue_position'] ?? 0;
+      final ahead = queueData['farmers_ahead'] ?? 0;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isTurn
-                ? '🎉 It is YOUR TURN! Please proceed to Counter #${booking?.counterNumber ?? 3}'
-                : 'Queue updated: Position #$pos (${booking?.farmersAhead ?? 0} farmers ahead)',
-          ),
-          backgroundColor: isTurn ? AppColors.success : AppColors.primary,
-          duration: const Duration(seconds: 2),
-        ),
+      _booking = _booking?.copyWith(
+        queuePosition: pos,
+        farmersAhead: ahead,
+        waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
+        counterNumber: queueData['active_counters'] ?? 3,
       );
-    });
+
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+
+        final isTurn = pos <= 1;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isTurn
+                  ? '🎉 It is YOUR TURN! Please proceed to the counter.'
+                  : 'Queue updated: Position #$pos ($ahead farmers ahead)',
+            ),
+            backgroundColor: isTurn ? AppColors.success : AppColors.primary,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final booking = _dataService.activeBooking ?? BookingModel.mockBooking();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('Live Queue')),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(color: AppColors.primary),
+              SizedBox(height: 16),
+              Text('Loading queue...', style: TextStyle(color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_error != null || _booking == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Live Queue'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.groups_outlined, size: 64, color: AppColors.textMuted),
+                const SizedBox(height: 16),
+                Text(_error ?? 'No active booking.', textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 16)),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _loadQueueData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('TRY AGAIN'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final booking = _booking!;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -104,7 +202,7 @@ class _QueueScreenState extends State<QueueScreen> {
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        'Live Token Stream is active. Tap Refresh to simulate queue updates.',
+                        'Live Token Stream is active. Tap Refresh to get latest queue data.',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

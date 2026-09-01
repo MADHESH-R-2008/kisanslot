@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/booking.dart';
-import '../services/mock_data_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
@@ -15,7 +14,8 @@ class BookingConfirmationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBooking = booking ?? MockDataService().activeBooking ?? BookingModel.mockBooking();
+    final activeBooking = booking ?? BookingModel.mockBooking();
+
 
     return Scaffold(
       backgroundColor: AppColors.background,
