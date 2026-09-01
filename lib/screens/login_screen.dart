@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController(text: '123456');
   bool _obscurePassword = true;
   bool _isLoading = false;
+  bool _isAdminLogin = false;
 
   @override
   void dispose() {
@@ -31,13 +32,30 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
 
       try {
-        final data = await ApiService.login(
-          mobile: _mobileController.text.trim(),
-          password: _passwordController.text.trim(),
-        );
+        if (_isAdminLogin) {
+          await ApiService.adminLogin(
+            username: _mobileController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
+          if (!mounted) return;
+          setState(() => _isLoading = false);
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Welcome Admin!'),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 2),
+            ),
+          );
+          Navigator.pushReplacementNamed(context, '/admin/home');
+        } else {
+          final data = await ApiService.login(
+            mobile: _mobileController.text.trim(),
+            password: _passwordController.text.trim(),
+          );
 
-        if (!mounted) return;
-        setState(() => _isLoading = false);
+          if (!mounted) return;
+          setState(() => _isLoading = false);
 
         final farmerName = data['farmer']?['name'] ?? 'Farmer';
 
@@ -50,6 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         Navigator.pushReplacementNamed(context, AppRoutes.home);
+        }
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
@@ -76,8 +95,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _fillDemoCredentials() {
     setState(() {
-      _mobileController.text = '9876543210';
-      _passwordController.text = '123456';
+      if (_isAdminLogin) {
+        _mobileController.text = 'admin';
+        _passwordController.text = 'admin123';
+      } else {
+        _mobileController.text = '9876543210';
+        _passwordController.text = '123456';
+      }
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -134,10 +158,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 4),
 
-                  const Center(
+                  Center(
                     child: Text(
-                      'Welcome Back 👋',
-                      style: TextStyle(
+                      _isAdminLogin ? 'Admin Portal 🛡️' : 'Welcome Back 👋',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
@@ -156,7 +180,31 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
+                  
+                  // Role Toggle
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      ChoiceChip(
+                        label: const Text('Farmer'),
+                        selected: !_isAdminLogin,
+                        onSelected: (val) {
+                          if (val) setState(() => _isAdminLogin = false);
+                        },
+                      ),
+                      const SizedBox(width: 12),
+                      ChoiceChip(
+                        label: const Text('Admin'),
+                        selected: _isAdminLogin,
+                        onSelected: (val) {
+                          if (val) setState(() => _isAdminLogin = true);
+                        },
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 20),
 
                   // Quick Demo Autofill chip
                   Align(
@@ -178,29 +226,29 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 12),
 
                   // Mobile Number Field
-                  const Text(
-                    'Mobile Number',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+                  Text(
+                    _isAdminLogin ? 'Username' : 'Mobile Number',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _mobileController,
-                    keyboardType: TextInputType.phone,
-                    inputFormatters: [
+                    keyboardType: _isAdminLogin ? TextInputType.text : TextInputType.phone,
+                    inputFormatters: _isAdminLogin ? [] : [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
                     ],
-                    decoration: const InputDecoration(
-                      hintText: 'Enter 10-digit mobile number',
-                      prefixIcon: Icon(Icons.phone_android_rounded),
-                      prefixText: '+91 ',
-                      prefixStyle: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: _isAdminLogin ? 'Enter username' : 'Enter 10-digit mobile number',
+                      prefixIcon: Icon(_isAdminLogin ? Icons.admin_panel_settings : Icons.phone_android_rounded),
+                      prefixText: _isAdminLogin ? '' : '+91 ',
+                      prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return 'Please enter mobile number';
+                        return _isAdminLogin ? 'Please enter username' : 'Please enter mobile number';
                       }
-                      if (value.trim().length != 10) {
+                      if (!_isAdminLogin && value.trim().length != 10) {
                         return 'Mobile number must be 10 digits';
                       }
                       return null;
@@ -273,7 +321,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
 
                   // Register prompt
-                  Row(
+                  if (!_isAdminLogin) Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(

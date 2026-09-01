@@ -15,7 +15,7 @@ class ApiService {
   //
   //  For Android Emulator use: http://10.0.2.2:8000
   // ──────────────────────────────────────────────
-  static const String baseUrl = 'http://192.168.31.244:8000';
+  static const String baseUrl = 'https://kisanslot-backend.onrender.com';
 
   static const _storage = FlutterSecureStorage();
   static const _tokenKey = 'jwt_token';
@@ -23,6 +23,10 @@ class ApiService {
   static const _farmerNameKey = 'farmer_name';
   static const _farmerFarmerId = 'farmer_farmer_id';
   static const _bookingIdKey = 'active_booking_id';
+  
+  // Admin Keys
+  static const _isAdminKey = 'is_admin';
+  static const _centreIdKey = 'admin_centre_id';
 
   // ──────────────────────────────────────────────
   //  Token Management
@@ -61,6 +65,16 @@ class ApiService {
 
   static Future<String?> getActiveBookingId() async {
     return await _storage.read(key: _bookingIdKey);
+  }
+
+  static Future<void> saveAdminInfo(int centreId) async {
+    await _storage.write(key: _isAdminKey, value: 'true');
+    await _storage.write(key: _centreIdKey, value: centreId.toString());
+  }
+
+  static Future<bool> isAdmin() async {
+    final val = await _storage.read(key: _isAdminKey);
+    return val == 'true';
   }
 
   // ──────────────────────────────────────────────
@@ -151,6 +165,28 @@ class ApiService {
     await saveToken(data['access_token']);
     final farmer = data['farmer'];
     await saveFarmerInfo(farmer['id'], farmer['name'], farmer['farmer_id']);
+
+    return data;
+  }
+
+  /// Login as Admin.
+  static Future<Map<String, dynamic>> adminLogin({
+    required String username,
+    required String password,
+  }) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/auth/admin/login'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+      }),
+    );
+
+    final data = _handleResponse(response);
+
+    await saveToken(data['access_token']);
+    await saveAdminInfo(data['centre_id']);
 
     return data;
   }
@@ -287,6 +323,25 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  /// Admin: Get live queue for centre
+  static Future<List<dynamic>> getAdminQueue() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/queue/admin/list'),
+      headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Admin: Update booking status
+  static Future<Map<String, dynamic>> updateBookingStatus(String bookingId, String status) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/queue/admin/booking/$bookingId/status'),
+      headers: await _authHeaders(),
+      body: jsonEncode({'status': status}),
+    );
+    return _handleResponse(response);
+  }
+
   // ──────────────────────────────────────────────
   //  Procurement APIs
   // ──────────────────────────────────────────────
@@ -296,6 +351,16 @@ class ApiService {
     final response = await http.get(
       Uri.parse('$baseUrl/api/procurement/$bookingId'),
       headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Admin: Update procurement details
+  static Future<Map<String, dynamic>> updateProcurement(String bookingId, Map<String, dynamic> data) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/procurement/$bookingId'),
+      headers: await _authHeaders(),
+      body: jsonEncode(data),
     );
     return _handleResponse(response);
   }

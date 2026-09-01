@@ -12,6 +12,8 @@ import '../screens/queue_screen.dart';
 import '../screens/procurement_screen.dart';
 import '../screens/payment_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/admin_home_screen.dart';
+import '../screens/admin_procurement_screen.dart';
 
 class AppRoutes {
   static const String splash = '/';
@@ -25,6 +27,8 @@ class AppRoutes {
   static const String procurement = '/procurement';
   static const String payment = '/payment';
   static const String profile = '/profile';
+  static const String adminHome = '/admin/home';
+  static const String adminProcurement = '/admin/procurement';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -56,6 +60,11 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const PaymentScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case adminHome:
+        return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
+      case adminProcurement:
+        final bookingId = settings.arguments as String?;
+        return MaterialPageRoute(builder: (_) => AdminProcurementScreen(bookingId: bookingId ?? ''));
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(

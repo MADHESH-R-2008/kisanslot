@@ -184,3 +184,21 @@ class Payment(Base):
 
     # Relationships
     booking = relationship("Booking", back_populates="payment")
+
+
+# ──────────────────────────────────────────────
+# Admin User
+# ──────────────────────────────────────────────
+
+class AdminUser(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    centre = relationship("Centre")
+

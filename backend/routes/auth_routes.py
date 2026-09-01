@@ -2,8 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Farmer
-from schemas import FarmerRegisterRequest, FarmerLoginRequest, TokenResponse, FarmerBrief
+from models import Farmer, AdminUser
+from schemas import (
+    FarmerRegisterRequest, FarmerLoginRequest, TokenResponse, FarmerBrief,
+    AdminLoginRequest, AdminTokenResponse
+)
 from auth import hash_password, verify_password, create_access_token
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
@@ -77,3 +80,30 @@ def login(req: FarmerLoginRequest, db: Session = Depends(get_db)):
         access_token=token,
         farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id),
     )
+
+
+@router.post("/admin/login", response_model=AdminTokenResponse)
+def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
+    """Authenticate an AdminUser and return a JWT token."""
+    
+    admin = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+    if not admin:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+
+    if not verify_password(req.password, admin.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password.",
+        )
+
+    # Note the 'role' field we added to the JWT payload in auth.py
+    token = create_access_token(data={"sub": str(admin.id), "role": "admin"})
+
+    return AdminTokenResponse(
+        access_token=token,
+        centre_id=admin.centre_id,
+    )
+

@@ -30,6 +30,17 @@ class TokenResponse(BaseModel):
     farmer: "FarmerBrief"
 
 
+class AdminLoginRequest(BaseModel):
+    username: str = Field(..., min_length=3)
+    password: str = Field(..., min_length=4)
+
+
+class AdminTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    centre_id: int
+
+
 class FarmerBrief(BaseModel):
     id: int
     name: str

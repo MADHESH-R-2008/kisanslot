@@ -2,12 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Farmer, Booking, Procurement
+from models import Farmer, Booking, Procurement, AdminUser, Payment
 from schemas import ProcurementResponse, ProcurementUpdateRequest
-from auth import get_current_farmer
+from auth import get_current_farmer, get_current_admin
 
 router = APIRouter(prefix="/api/procurement", tags=["Procurement"])
-
 
 @router.get("/{booking_id}", response_model=ProcurementResponse)
 def get_procurement(
@@ -37,17 +36,20 @@ def get_procurement(
         status=procurement.status.value,
     )
 
-
 @router.put("/{booking_id}", response_model=ProcurementResponse)
 def update_procurement(
     booking_id: str,
     req: ProcurementUpdateRequest,
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Admin/test endpoint to update procurement status."""
+    """Admin endpoint to update procurement status."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    if booking.centre_id != admin.centre_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized for this centre.")
 
     procurement = db.query(Procurement).filter(Procurement.booking_id == booking.id).first()
     if not procurement:
@@ -55,14 +57,21 @@ def update_procurement(
 
     if req.quality_status is not None:
         procurement.quality_status = req.quality_status
-    if req.actual_weight is not None:
-        procurement.actual_weight = req.actual_weight
     if req.rate is not None:
         procurement.rate = req.rate
+    if req.actual_weight is not None:
+        procurement.actual_weight = req.actual_weight
+        procurement.total_amount = req.actual_weight * procurement.rate
     if req.total_amount is not None:
         procurement.total_amount = req.total_amount
     if req.status is not None:
         procurement.status = req.status
+
+    # Update associated payment if amount was calculated
+    if procurement.total_amount is not None:
+        payment = db.query(Payment).filter(Payment.booking_id == booking.id).first()
+        if payment:
+            payment.amount = procurement.total_amount
 
     db.commit()
     db.refresh(procurement)

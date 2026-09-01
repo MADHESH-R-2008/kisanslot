@@ -7,7 +7,7 @@ Run: python seed.py
 from datetime import date, time, datetime
 from database import SessionLocal, engine, Base
 from models import (
-    Farmer, Centre, Slot, Booking, Procurement, Payment,
+    Farmer, Centre, Slot, Booking, Procurement, Payment, AdminUser,
     BookingStatusEnum, ProcurementStatusEnum, PaymentStatusEnum,
 )
 from auth import hash_password
@@ -88,6 +88,17 @@ def seed():
         db.add_all(centres)
         db.flush()
         print(f"   ✅ Centres: {len(centres)} centres created")
+
+        # ─── Admin User ────────────────────────────────────────
+        admin = AdminUser(
+            username="admin",
+            password_hash=hash_password("admin123"),
+            centre_id=centres[0].id,
+        )
+        db.add(admin)
+        db.flush()
+        print(f"   ✅ Admin: {admin.username} (Centre: {centres[0].name}, Password: admin123)")
+
 
         # ─── Slots ──────────────────────────────────────────
         slot_times = [
@@ -187,6 +198,11 @@ def seed():
         print("│  Password: 123456                       │")
         print("│  Name:     Ravi Kumar                   │")
         print("│  Farmer ID: FR10245                     │")
+        print("├─────────────────────────────────────────┤")
+        print("│  ADMIN TEST CREDENTIALS                 │")
+        print("├─────────────────────────────────────────┤")
+        print("│  Username: admin                        │")
+        print("│  Password: admin123                     │")
         print("└─────────────────────────────────────────┘")
 
     except Exception as e:

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from config import get_settings
 from database import get_db
-from models import Farmer
+from models import Farmer, AdminUser
 
 settings = get_settings()
 
@@ -62,3 +62,31 @@ def get_current_farmer(
         raise credentials_exception
 
     return farmer
+
+
+def get_current_admin(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> AdminUser:
+    """FastAPI dependency: extract and validate JWT, return the AdminUser ORM object."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or expired token. Please login again.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        admin_id: Optional[int] = payload.get("sub")
+        role: Optional[str] = payload.get("role")
+        if admin_id is None or role != "admin":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+
+    admin = db.query(AdminUser).filter(AdminUser.id == int(admin_id)).first()
+    if admin is None:
+        raise credentials_exception
+
+    return admin
+
