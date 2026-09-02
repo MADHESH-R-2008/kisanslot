@@ -36,7 +36,35 @@ def get_procurement(
         status=procurement.status.value,
     )
 
-@router.put("/{booking_id}", response_model=ProcurementResponse)
+@router.get("/admin/{booking_id}", response_model=ProcurementResponse)
+def admin_get_procurement(
+    booking_id: str,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Admin endpoint to get procurement status for a booking."""
+    booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Booking not found.")
+
+    if booking.centre_id != admin.centre_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized for this centre.")
+
+    procurement = db.query(Procurement).filter(Procurement.booking_id == booking.id).first()
+    if not procurement:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Procurement record not found.")
+
+    return ProcurementResponse(
+        crop=booking.crop,
+        expected_quantity=booking.expected_quantity,
+        actual_weight=procurement.actual_weight,
+        quality_status=procurement.quality_status,
+        rate=procurement.rate,
+        total_amount=procurement.total_amount,
+        status=procurement.status.value if not isinstance(procurement.status, str) else procurement.status,
+    )
+
+@router.put("/admin/{booking_id}", response_model=ProcurementResponse)
 def update_procurement(
     booking_id: str,
     req: ProcurementUpdateRequest,

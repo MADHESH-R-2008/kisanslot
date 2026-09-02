@@ -350,16 +350,17 @@ class ApiService {
   /// Get procurement status for a booking.
   static Future<Map<String, dynamic>> getProcurement(String bookingId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/procurement/$bookingId'),
+      Uri.parse('$baseUrl/api/procurement/admin/$bookingId'),
       headers: await _authHeaders(),
     );
     return _handleResponse(response);
   }
 
   /// Admin: Update procurement details
-  static Future<Map<String, dynamic>> updateProcurement(String bookingId, Map<String, dynamic> data) async {
+  static Future<Map<String, dynamic>> updateProcurement(
+      String bookingId, Map<String, dynamic> data) async {
     final response = await http.put(
-      Uri.parse('$baseUrl/api/procurement/$bookingId'),
+      Uri.parse('$baseUrl/api/procurement/admin/$bookingId'),
       headers: await _authHeaders(),
       body: jsonEncode(data),
     );
