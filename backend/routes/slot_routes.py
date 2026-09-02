@@ -43,3 +43,55 @@ def list_slots(
         )
 
     return result
+
+@router.post("/rollover", tags=["Admin"])
+def rollover_slots(db: Session = Depends(get_db)):
+    """Close slots for past dates and open slots for the next 7 days for all active centres."""
+    from datetime import date, timedelta, time
+    from models import Centre
+    
+    today = date.today()
+    
+    # 1. Close past slots
+    past_slots = db.query(Slot).filter(Slot.date < today, Slot.is_active == True).all()
+    for s in past_slots:
+        s.is_active = False
+        
+    # 2. Open slots for next 7 days for all active centres
+    active_centres = db.query(Centre).filter(Centre.is_active == True).all()
+    
+    slot_times = [
+        (time(9, 0), time(10, 0)),
+        (time(10, 0), time(11, 0)),
+        (time(11, 0), time(12, 0)),
+        (time(12, 0), time(13, 0)),
+        (time(14, 0), time(15, 0)),
+        (time(15, 0), time(16, 0)),
+    ]
+    
+    new_slots_count = 0
+    for centre in active_centres:
+        for i in range(7):
+            target_date = today + timedelta(days=i)
+            # Check if slots already exist for this date and centre
+            existing = db.query(Slot).filter(Slot.centre_id == centre.id, Slot.date == target_date).first()
+            if not existing:
+                for start, end in slot_times:
+                    slot = Slot(
+                        centre_id=centre.id,
+                        date=target_date,
+                        start_time=start,
+                        end_time=end,
+                        capacity=25,
+                        booked_count=0,
+                        is_active=True,
+                    )
+                    db.add(slot)
+                    new_slots_count += 1
+                    
+    db.commit()
+    return {
+        "message": "Rollover complete",
+        "closed_slots": len(past_slots),
+        "new_slots": new_slots_count
+    }
