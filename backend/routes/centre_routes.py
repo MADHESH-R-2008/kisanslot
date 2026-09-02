@@ -19,11 +19,11 @@ def list_centres(db: Session = Depends(get_db)):
 @router.post("/", response_model=CentreResponse)
 def create_centre(
     payload: CentreCreateRequest,
-    admin: AdminUser = Depends(require_admin_or_super()),
+    admin: dict = Depends(require_admin_or_super()),
     db: Session = Depends(get_db),
 ):
     # Ensure the caller has sufficient role
-    if admin.role.value not in [RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
+    if admin.get("role") not in [RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
     centre = Centre(
         name=payload.name,
@@ -51,7 +51,7 @@ def create_centre(
 def update_centre(
     centre_id: int,
     payload: CentreUpdateRequest,
-    admin: AdminUser = Depends(require_admin_or_super()),
+    admin: dict = Depends(require_admin_or_super()),
     db: Session = Depends(get_db),
     allowed: bool = Depends(enforce_operator_centre),
 ):
