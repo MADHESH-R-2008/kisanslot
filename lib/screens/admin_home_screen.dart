@@ -105,7 +105,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 ),
                 Chip(
                   label: Text(status),
-                  backgroundColor: _getStatusColor(status).withValues(alpha: 0.1),
+                  backgroundColor: _getStatusColor(status).withOpacity(0.1),
                   labelStyle: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.bold),
                 )
               ],
