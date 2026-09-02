@@ -89,6 +89,7 @@ class CentreResponse(BaseModel):
     longitude: float
     active_counters: int
     is_active: bool
+    is_paused: bool = False
     distance_km: float
     rating: float
     queue_count: int = 0
@@ -181,6 +182,7 @@ class CentreQueueStatusResponse(BaseModel):
     processing_count: int
     completed_count: int
     active_counters: int
+    is_paused: bool = False
     queue: list[QueueEntry]
 
 # ──────────────────────────────────────────────
@@ -223,13 +225,26 @@ class PaymentUpdateRequest(BaseModel):
 # Notification Schemas
 # ──────────────────────────────────────────────
 
-class NotificationResponse(BaseModel):
+class CounterResponse(BaseModel):
     id: int
-    title: str
-    message: str
-    type: str
-    is_read: bool
+    centre_id: int
+    name: str
+    status: str
+    is_available: bool
     created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
+
+class CounterCreateRequest(BaseModel):
+    centre_id: int
+    name: str
+    status: Optional[str] = "ACTIVE"
+    is_available: Optional[bool] = true
+
+class CounterUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+    is_available: Optional[bool] = None
+

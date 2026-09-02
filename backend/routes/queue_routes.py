@@ -6,6 +6,7 @@ from schemas import QueueResponse, BookingDetailResponse, CentreQueueStatusRespo
 from auth import get_current_farmer, get_current_admin
 from services.queue_service import calculate_queue_position
 from routes.ws_routes import manager
+from models import Centre
 
 router = APIRouter(prefix="/api/queue", tags=["Queue"])
 
@@ -19,7 +20,8 @@ async def broadcast_queue_update(centre_id: int, db: Session):
     await manager.broadcast({
         "event": "QUEUE_UPDATED",
         "centre_id": centre_id,
-        "waiting_count": waiting_count
+        "waiting_count": waiting_count,
+        "is_paused": db.query(Centre).filter(Centre.id == centre_id).first().is_paused
     }, centre_id)
 
 @router.get("/{booking_id}", response_model=QueueResponse)
@@ -78,7 +80,15 @@ def get_centre_queue_status(
             queue_entries.append(QueueEntry(token=b.token_number, booking_id=b.booking_id, farmer_name=b.farmer.name, status=status_str, arrival_time=b.arrival_time, queue_position=None))
             
     completed_count = db.query(Booking).filter(Booking.centre_id == centre_id, Booking.status == BookingStatusEnum.COMPLETED).count()
-    return CentreQueueStatusResponse(centre_id=centre_id, waiting_count=waiting_count, processing_count=processing_count, completed_count=completed_count, active_counters=centre.active_counters, queue=queue_entries)
+    return CentreQueueStatusResponse(
+        centre_id=centre_id,
+        waiting_count=waiting_count,
+        processing_count=processing_count,
+        completed_count=completed_count,
+        active_counters=centre.active_counters,
+        is_paused=centre.is_paused,
+        queue=queue_entries,
+    )
 
 @router.get("/admin/list", response_model=list[BookingDetailResponse])
 def get_admin_queue(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
@@ -105,7 +115,31 @@ async def update_booking_status(booking_id: str, req: StatusUpdateRequest, admin
     await broadcast_queue_update(booking.centre_id, db)
     return {"message": f"Status updated to {req.status}", "booking_id": booking_id}
 
-@router.post("/admin/queue/next")
+@router.post("/admin/queue/pause")
+async def pause_queue(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    centre_id = admin.centre_id
+    if not centre_id:
+        raise HTTPException(status_code=400, detail="No centre assigned.")
+    centre = db.query(Centre).filter(Centre.id == centre_id).first()
+    if not centre:
+        raise HTTPException(status_code=404, detail="Centre not found.")
+    centre.is_paused = True
+    db.commit()
+    await broadcast_queue_update(centre_id, db)
+    return {"message": "Queue paused"}
+
+@router.post("/admin/queue/resume")
+async def resume_queue(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    centre_id = admin.centre_id
+    if not centre_id:
+        raise HTTPException(status_code=400, detail="No centre assigned.")
+    centre = db.query(Centre).filter(Centre.id == centre_id).first()
+    if not centre:
+        raise HTTPException(status_code=404, detail="Centre not found.")
+    centre.is_paused = False
+    db.commit()
+    await broadcast_queue_update(centre_id, db)
+    return {"message": "Queue resumed"}
 async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     from datetime import datetime
     centre_id = admin.centre_id

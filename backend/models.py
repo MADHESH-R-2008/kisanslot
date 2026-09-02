@@ -80,12 +80,18 @@ class Centre(Base):
     longitude = Column(Float, default=0.0)
     active_counters = Column(Integer, default=3)
     is_active = Column(Boolean, default=True)
+    is_paused = Column(Boolean, default=False)
     distance_km = Column(Float, default=0.0)
     rating = Column(Float, default=4.5)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     slots = relationship("Slot", back_populates="centre", cascade="all, delete-orphan")
+
+    # ──────────────────────────────────────────────
+    # Counters
+    # ──────────────────────────────────────────────
+    counters = relationship("Counter", back_populates="centre", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="centre")
 
 # ──────────────────────────────────────────────
@@ -124,6 +130,7 @@ class Booking(Base):
     farmer_id = Column(Integer, ForeignKey("farmers.id"), nullable=False)
     centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False)
     slot_id = Column(Integer, ForeignKey("slots.id"), nullable=False)
+    is_deleted = Column(Boolean, default=False)
     crop = Column(String(100), nullable=False)
     expected_quantity = Column(Float, nullable=False)
     vehicle_number = Column(String(20), nullable=False)
@@ -137,6 +144,7 @@ class Booking(Base):
     call_time = Column(DateTime, nullable=True) # Track when they were called
     assigned_counter = Column(Integer, nullable=True) # Track which counter
     created_at = Column(DateTime, default=datetime.utcnow)
+
 
     # Relationships
     farmer = relationship("Farmer", back_populates="bookings")
@@ -197,6 +205,7 @@ class AdminUser(Base):
     __tablename__ = "admins"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    # No changes needed here
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(
@@ -241,4 +250,27 @@ class AuditLog(Base):
     entity_id = Column(String(50), nullable=True)
     ip_address = Column(String(50), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+
+# ──────────────────────────────────────────────
+# Counter Model and Enum
+# ──────────────────────────────────────────────
+
+class CounterStatusEnum(str, enum.Enum):
+    ACTIVE = "ACTIVE"
+    INACTIVE = "INACTIVE"
+    MAINTENANCE = "MAINTENANCE"
+
+class Counter(Base):
+    __tablename__ = "counters"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False)
+    name = Column(String(255), nullable=False)
+    status = Column(SAEnum(CounterStatusEnum, values_callable=lambda e: [x.value for x in e]), default=CounterStatusEnum.ACTIVE, nullable=False)
+    is_available = Column(Boolean, default=True)
+    is_deleted = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    centre = relationship("Centre", back_populates="counters")
 
