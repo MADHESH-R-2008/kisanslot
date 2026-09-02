@@ -50,6 +50,7 @@ def seed():
         centres = [
             Centre(
                 name="Centre A",
+                code="CTR-A",
                 address="APMC Market Yard, North Block, Main Road",
                 district="Example District",
                 state="Tamil Nadu",
@@ -62,6 +63,7 @@ def seed():
             ),
             Centre(
                 name="Centre B",
+                code="CTR-B",
                 address="Taluk Regulated Agricultural Market, Highway Junction",
                 district="Example District",
                 state="Tamil Nadu",
@@ -74,6 +76,7 @@ def seed():
             ),
             Centre(
                 name="Centre C",
+                code="CTR-C",
                 address="District Farmers Co-operative Hub, Sector 4",
                 district="Example District",
                 state="Tamil Nadu",
