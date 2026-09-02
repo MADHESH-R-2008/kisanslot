@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import Optional
+from pydantic import BaseModel
 
 from database import get_db
 from models import Farmer, AdminUser
@@ -108,4 +110,34 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
         centre_id=admin.centre_id,
         role=role_str
     )
+
+class UnifiedLoginRequest(BaseModel):
+    mobile: Optional[str] = None
+    username: Optional[str] = None
+    password: str
+
+@router.post("/unified-login")
+def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
+    """Unified login supporting both farmer (mobile) and admin (username) authentication.
+    Returns appropriate token response based on credentials.
+    """
+    if req.mobile:
+        farmer = db.query(Farmer).filter(Farmer.mobile == req.mobile).first()
+        if not farmer:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No farmer account found with this mobile number.")
+        if not verify_password(req.password, farmer.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for farmer account.")
+        token = create_access_token(data={"sub": str(farmer.id)})
+        return TokenResponse(access_token=token, farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id))
+    elif req.username:
+        admin = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+        if not admin:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin username.")
+        if not verify_password(req.password, admin.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for admin account.")
+        role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
+        token = create_access_token(data={"sub": str(admin.id), "role": role_str})
+        return AdminTokenResponse(access_token=token, centre_id=admin.centre_id, role=role_str)
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide either mobile (farmer) or username (admin) for login.")
 

@@ -73,17 +73,21 @@ class Centre(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(255), nullable=False)
+    code = Column(String(20), nullable=False, unique=True)
     address = Column(Text, nullable=False)
     district = Column(String(255), nullable=False)
     state = Column(String(255), nullable=False)
+    contact_number = Column(String(20), nullable=True)
     latitude = Column(Float, default=0.0)
     longitude = Column(Float, default=0.0)
+    total_counters = Column(Integer, default=3)
     active_counters = Column(Integer, default=3)
     is_active = Column(Boolean, default=True)
     is_paused = Column(Boolean, default=False)
     distance_km = Column(Float, default=0.0)
     rating = Column(Float, default=4.5)
     created_at = Column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("code", name="uq_centre_code"),)
 
     # Relationships
     slots = relationship("Slot", back_populates="centre", cascade="all, delete-orphan")

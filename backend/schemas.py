@@ -98,6 +98,37 @@ class CentreResponse(BaseModel):
     class Config:
         from_attributes = True
 
+class CentreCreateRequest(BaseModel):
+    name: str
+    code: str
+    address: str
+    district: str
+    state: str
+    latitude: Optional[float] = 0.0
+    longitude: Optional[float] = 0.0
+    contact_number: Optional[str] = None
+    total_counters: Optional[int] = 3
+    active_counters: Optional[int] = 3
+    is_active: Optional[bool] = True
+    is_paused: Optional[bool] = False
+    distance_km: Optional[float] = 0.0
+    rating: Optional[float] = 4.5
+
+class CentreUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    address: Optional[str] = None
+    district: Optional[str] = None
+    state: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    contact_number: Optional[str] = None
+    total_counters: Optional[int] = None
+    active_counters: Optional[int] = None
+    is_active: Optional[bool] = None
+    is_paused: Optional[bool] = None
+    distance_km: Optional[float] = None
+    rating: Optional[float] = None
+
 # ──────────────────────────────────────────────
 # Slot Schemas
 # ──────────────────────────────────────────────
@@ -241,7 +272,7 @@ class CounterCreateRequest(BaseModel):
     centre_id: int
     name: str
     status: Optional[str] = "ACTIVE"
-    is_available: Optional[bool] = true
+    is_available: Optional[bool] = True
 
 class CounterUpdateRequest(BaseModel):
     name: Optional[str] = None

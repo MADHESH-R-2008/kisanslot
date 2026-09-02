@@ -16,8 +16,11 @@ const Login = () => {
     
     try {
       const response = await authAPI.login(username, password);
-      localStorage.setItem('token', response.data.access_token);
-      localStorage.setItem('role', response.data.role);
+      const { access_token, role, centre_id } = response.data;
+      localStorage.setItem('token', access_token);
+      localStorage.setItem('role', role);
+      localStorage.setItem('username', username);
+      if (centre_id) localStorage.setItem('centre_id', String(centre_id));
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please check credentials.');

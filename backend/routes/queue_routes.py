@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import Farmer, Booking, Centre, BookingStatusEnum, AdminUser
 from schemas import QueueResponse, BookingDetailResponse, CentreQueueStatusResponse, QueueEntry
-from auth import get_current_farmer, get_current_admin
+from auth import get_current_farmer
+from dependencies import get_current_admin, require_admin_or_super
 from services.queue_service import calculate_queue_position
 from routes.ws_routes import manager
-from models import Centre
 
 router = APIRouter(prefix="/api/queue", tags=["Queue"])
 
@@ -140,6 +140,7 @@ async def resume_queue(admin: AdminUser = Depends(get_current_admin), db: Sessio
     db.commit()
     await broadcast_queue_update(centre_id, db)
     return {"message": "Queue resumed"}
+@router.post("/admin/queue/next")
 async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     from datetime import datetime
     centre_id = admin.centre_id
@@ -154,7 +155,7 @@ async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Se
     return {"message": "Next farmer called", "booking_id": next_booking.booking_id, "token_number": next_booking.token_number, "status": next_booking.status.value}
 
 @router.post("/admin/booking/{booking_id}/start")
-async def start_processing(booking_id: str, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+async def start_processing(booking_id: str, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db), _=Depends(require_admin_or_super())):
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking: raise HTTPException(status_code=404, detail="Booking not found.")
     if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN": raise HTTPException(status_code=403, detail="Unauthorized")
@@ -165,7 +166,7 @@ async def start_processing(booking_id: str, admin: AdminUser = Depends(get_curre
     return {"message": "Processing started", "status": booking.status.value}
 
 @router.post("/admin/booking/{booking_id}/complete")
-async def complete_processing(booking_id: str, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+async def complete_processing(booking_id: str, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db), _=Depends(require_admin_or_super())):
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking: raise HTTPException(status_code=404, detail="Booking not found.")
     if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN": raise HTTPException(status_code=403, detail="Unauthorized")
@@ -176,7 +177,7 @@ async def complete_processing(booking_id: str, admin: AdminUser = Depends(get_cu
     return {"message": "Processing completed", "status": booking.status.value}
 
 @router.post("/admin/booking/{booking_id}/no_show")
-async def mark_no_show(booking_id: str, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+async def mark_no_show(booking_id: str, admin: AdminUser = Depends(require_admin_or_super()), db: Session = Depends(get_db)):
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking: raise HTTPException(status_code=404, detail="Booking not found.")
     if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN": raise HTTPException(status_code=403, detail="Unauthorized")

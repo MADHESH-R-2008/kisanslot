@@ -96,15 +96,37 @@ def seed():
             centre_id=centres[0].id,
             role="CENTRE_OPERATOR"
         )
+        # Phase 3.1 required accounts
+        operator1 = AdminUser(
+            username="operator1",
+            password_hash=hash_password("op123"),
+            centre_id=centres[2].id,  # Centre C (id 3)
+            role="CENTRE_OPERATOR"
+        )
+        admin_user = AdminUser(
+            username="admin_user",
+            password_hash=hash_password("admin123"),
+            centre_id=None,
+            role="ADMIN"
+        )
+        super_admin = AdminUser(
+            username="super",
+            password_hash=hash_password("super123"),
+            centre_id=None,
+            role="SUPER_ADMIN"
+        )
         master = AdminUser(
             username="master",
             password_hash=hash_password("master123"),
             centre_id=None,
             role="SUPER_ADMIN"
         )
-        db.add_all([operator, master])
+        db.add_all([operator, operator1, admin_user, super_admin, master])
         db.flush()
         print(f"   ✅ Operator: {operator.username} (Centre: {centres[0].name}, Password: admin123)")
+        print(f"   ✅ Operator1: {operator1.username} (Centre: {centres[2].name}, Password: op123)")
+        print(f"   ✅ Admin: {admin_user.username} (Password: admin123)")
+        print(f"   ✅ Super Admin: {super_admin.username} (Password: super123)")
         print(f"   ✅ Master Admin: {master.username} (Role: {master.role}, Password: master123)")
 
 

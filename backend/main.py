@@ -11,6 +11,9 @@ from routes import (
     queue_routes,
     procurement_routes,
     payment_routes,
+    ws_routes,
+    notification_routes,
+    counter_routes,
 )
 
 # Create all tables on startup
@@ -44,6 +47,7 @@ app.include_router(procurement_routes.router)
 app.include_router(payment_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(notification_routes.router)
+app.include_router(counter_routes.router)
 
 
 @app.get("/", tags=["Health"])
@@ -59,3 +63,12 @@ def root():
 @app.get("/health", tags=["Health"])
 def health_check():
     return {"status": "healthy"}
+
+@app.get("/api/seed", tags=["System"])
+def seed_database():
+    try:
+        from seed import seed
+        seed()
+        return {"message": "Database seeded successfully! You can now log in."}
+    except Exception as e:
+        return {"error": f"Failed to seed database: {str(e)}"}
