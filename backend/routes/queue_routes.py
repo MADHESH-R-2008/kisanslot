@@ -94,10 +94,29 @@ def get_centre_queue_status(
 def get_admin_queue(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     if admin.role.value not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
-    centre_id = admin.centre_id or 1
-    bookings = db.query(Booking).filter(Booking.centre_id == centre_id, Booking.status.not_in([BookingStatusEnum.COMPLETED, BookingStatusEnum.CANCELLED])).order_by(Booking.token_number.asc()).all()
     
-    return [BookingDetailResponse(booking_id=b.booking_id, token_number=b.token_number, centre=admin.centre.name if admin.centre else "Centre A", centre_id=centre_id, date=b.slot.date.isoformat(), time=f"{b.slot.start_time.strftime('%H:%M')}-{b.slot.end_time.strftime('%H:%M')}", crop=b.crop, quantity=b.expected_quantity, vehicle_number=b.vehicle_number, status=b.status.value if hasattr(b.status, 'value') else b.status) for b in bookings]
+    query = db.query(Booking).filter(
+        Booking.status.notin_([BookingStatusEnum.COMPLETED, BookingStatusEnum.CANCELLED])
+    )
+    
+    # SUPER_ADMIN and ADMIN see all centres; operators see only their centre
+    if admin.centre_id:
+        query = query.filter(Booking.centre_id == admin.centre_id)
+    
+    bookings = query.order_by(Booking.token_number.asc()).all()
+    
+    return [BookingDetailResponse(
+        booking_id=b.booking_id, 
+        token_number=b.token_number, 
+        centre=b.centre.name if b.centre else "Unknown", 
+        centre_id=b.centre_id, 
+        date=b.slot.date.isoformat(), 
+        time=f"{b.slot.start_time.strftime('%H:%M')}-{b.slot.end_time.strftime('%H:%M')}", 
+        crop=b.crop, 
+        quantity=b.expected_quantity, 
+        vehicle_number=b.vehicle_number, 
+        status=b.status.value if hasattr(b.status, 'value') else b.status
+    ) for b in bookings]
 
 from pydantic import BaseModel
 class StatusUpdateRequest(BaseModel):

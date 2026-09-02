@@ -68,9 +68,11 @@ class ApiService {
     return await _storage.read(key: _bookingIdKey);
   }
 
-  static Future<void> saveAdminInfo(int centreId) async {
+  static Future<void> saveAdminInfo(int? centreId) async {
     await _storage.write(key: _isAdminKey, value: 'true');
-    await _storage.write(key: _centreIdKey, value: centreId.toString());
+    if (centreId != null) {
+      await _storage.write(key: _centreIdKey, value: centreId.toString());
+    }
   }
 
   static Future<bool> isAdmin() async {
