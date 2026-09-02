@@ -49,16 +49,15 @@ def rollover_slots(db: Session = Depends(get_db)):
     """Close slots for past dates and open slots for the next 7 days for all active centres."""
     from datetime import date, timedelta, time
     from models import Centre
+    import traceback
     
     try:
         today = date.today()
         
         # 1. Close past slots
-        closed_count = (
-            db.query(Slot)
-            .filter(Slot.date < today, Slot.is_active == True)
-            .update({Slot.is_active: False}, synchronize_session="fetch")
-        )
+        past_slots = db.query(Slot).filter(Slot.date < today, Slot.is_active == True).all()
+        for s in past_slots:
+            s.is_active = False
             
         # 2. Open slots for next 7 days for all active centres
         active_centres = db.query(Centre).filter(Centre.is_active == True).all()
@@ -76,7 +75,6 @@ def rollover_slots(db: Session = Depends(get_db)):
         for centre in active_centres:
             for i in range(7):
                 target_date = today + timedelta(days=i)
-                # Check if slots already exist for this date and centre
                 existing = db.query(Slot).filter(
                     Slot.centre_id == centre.id, 
                     Slot.date == target_date
@@ -99,11 +97,10 @@ def rollover_slots(db: Session = Depends(get_db)):
         return {
             "message": "Rollover complete",
             "today": str(today),
-            "closed_slots": closed_count,
+            "closed_slots": len(past_slots),
             "new_slots": new_slots_count,
             "centres": len(active_centres),
         }
     except Exception as e:
         db.rollback()
-        return {"error": str(e), "type": type(e).__name__}
-
+        return {"error": str(e), "type": type(e).__name__, "traceback": traceback.format_exc()}
