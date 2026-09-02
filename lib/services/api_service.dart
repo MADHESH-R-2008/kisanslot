@@ -11,11 +11,12 @@ class ApiService {
   //
   //  To find your IP:
   //    Windows CMD:  ipconfig → look for IPv4 Address
-  //    Example:      http://192.168.1.100:8000
+  //  Example:      http://192.168.1.100:8000
   //
   //  For Android Emulator use: http://10.0.2.2:8000
   // ──────────────────────────────────────────────
   static const String baseUrl = 'https://kisanslot-backend.onrender.com';
+  // static const String baseUrl = 'http://192.168.31.244:8000';
 
   static const _storage = FlutterSecureStorage();
   static const _tokenKey = 'jwt_token';
