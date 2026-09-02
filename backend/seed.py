@@ -89,15 +89,23 @@ def seed():
         db.flush()
         print(f"   ✅ Centres: {len(centres)} centres created")
 
-        # ─── Admin User ────────────────────────────────────────
-        admin = AdminUser(
+        # ─── Admin Users ───────────────────────────────────────
+        operator = AdminUser(
             username="admin",
             password_hash=hash_password("admin123"),
             centre_id=centres[0].id,
+            role="CENTRE_OPERATOR"
         )
-        db.add(admin)
+        master = AdminUser(
+            username="master",
+            password_hash=hash_password("master123"),
+            centre_id=None,
+            role="SUPER_ADMIN"
+        )
+        db.add_all([operator, master])
         db.flush()
-        print(f"   ✅ Admin: {admin.username} (Centre: {centres[0].name}, Password: admin123)")
+        print(f"   ✅ Operator: {operator.username} (Centre: {centres[0].name}, Password: admin123)")
+        print(f"   ✅ Master Admin: {master.username} (Role: {master.role}, Password: master123)")
 
 
         # ─── Slots ──────────────────────────────────────────
@@ -199,10 +207,15 @@ def seed():
         print("│  Name:     Ravi Kumar                   │")
         print("│  Farmer ID: FR10245                     │")
         print("├─────────────────────────────────────────┤")
-        print("│  ADMIN TEST CREDENTIALS                 │")
+        print("│  CENTRE OPERATOR CREDENTIALS            │")
         print("├─────────────────────────────────────────┤")
         print("│  Username: admin                        │")
         print("│  Password: admin123                     │")
+        print("├─────────────────────────────────────────┤")
+        print("│  MASTER ADMIN CREDENTIALS               │")
+        print("├─────────────────────────────────────────┤")
+        print("│  Username: master                       │")
+        print("│  Password: master123                    │")
         print("└─────────────────────────────────────────┘")
 
     except Exception as e:

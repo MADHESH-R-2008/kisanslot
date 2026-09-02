@@ -38,8 +38,8 @@ class AdminLoginRequest(BaseModel):
 class AdminTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    centre_id: int
-
+    centre_id: Optional[int] = None
+    role: str
 
 class FarmerBrief(BaseModel):
     id: int
@@ -48,7 +48,6 @@ class FarmerBrief(BaseModel):
 
     class Config:
         from_attributes = True
-
 
 # ──────────────────────────────────────────────
 # Farmer Schemas
@@ -68,7 +67,6 @@ class FarmerResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class FarmerUpdateRequest(BaseModel):
     name: Optional[str] = None
     village: Optional[str] = None
@@ -76,7 +74,6 @@ class FarmerUpdateRequest(BaseModel):
     state: Optional[str] = None
     crop: Optional[str] = None
     expected_quantity: Optional[float] = None
-
 
 # ──────────────────────────────────────────────
 # Centre Schemas
@@ -100,7 +97,6 @@ class CentreResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 # ──────────────────────────────────────────────
 # Slot Schemas
 # ──────────────────────────────────────────────
@@ -117,7 +113,6 @@ class SlotResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 # ──────────────────────────────────────────────
 # Booking Schemas
 # ──────────────────────────────────────────────
@@ -128,7 +123,6 @@ class BookingCreateRequest(BaseModel):
     crop: str = Field(..., min_length=2, max_length=100)
     expected_quantity: float = Field(..., gt=0)
     vehicle_number: str = Field(..., min_length=2, max_length=20)
-
 
 class BookingResponse(BaseModel):
     booking_id: str
@@ -146,7 +140,6 @@ class BookingResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 class BookingDetailResponse(BaseModel):
     booking_id: str
     token_number: int
@@ -162,7 +155,6 @@ class BookingDetailResponse(BaseModel):
     class Config:
         from_attributes = True
 
-
 # ──────────────────────────────────────────────
 # Queue Schemas
 # ──────────────────────────────────────────────
@@ -175,6 +167,21 @@ class QueueResponse(BaseModel):
     active_counters: int
     status: str
 
+class QueueEntry(BaseModel):
+    token: int
+    booking_id: str
+    farmer_name: str
+    status: str
+    arrival_time: Optional[datetime] = None
+    queue_position: Optional[int] = None
+
+class CentreQueueStatusResponse(BaseModel):
+    centre_id: int
+    waiting_count: int
+    processing_count: int
+    completed_count: int
+    active_counters: int
+    queue: list[QueueEntry]
 
 # ──────────────────────────────────────────────
 # Procurement Schemas
@@ -189,14 +196,12 @@ class ProcurementResponse(BaseModel):
     total_amount: Optional[float] = None
     status: str
 
-
 class ProcurementUpdateRequest(BaseModel):
     quality_status: Optional[str] = None
     actual_weight: Optional[float] = None
     rate: Optional[float] = None
     total_amount: Optional[float] = None
     status: Optional[str] = None
-
 
 # ──────────────────────────────────────────────
 # Payment Schemas
@@ -208,9 +213,23 @@ class PaymentResponse(BaseModel):
     status: str
     payment_date: Optional[datetime] = None
 
-
 class PaymentUpdateRequest(BaseModel):
     amount: Optional[float] = None
     transaction_id: Optional[str] = None
     status: Optional[str] = None
     payment_date: Optional[datetime] = None
+
+# ──────────────────────────────────────────────
+# Notification Schemas
+# ──────────────────────────────────────────────
+
+class NotificationResponse(BaseModel):
+    id: int
+    title: str
+    message: str
+    type: str
+    is_read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

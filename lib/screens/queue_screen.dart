@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:convert';
 import '../models/booking.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -17,11 +19,43 @@ class _QueueScreenState extends State<QueueScreen> {
   bool _isLoading = true;
   BookingModel? _booking;
   String? _error;
+  WebSocketChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _loadQueueData();
+  }
+  
+  @override
+  void dispose() {
+    _channel?.sink.close();
+    super.dispose();
+  }
+  
+  void _setupWebSocket(int centreId) {
+    if (_channel != null) return; // already connected
+    
+    // Determine WS url based on API base url
+    final wsBase = ApiService.baseUrl.replaceFirst('http', 'ws');
+    final wsUrl = Uri.parse('$wsBase/ws/queue/$centreId');
+    
+    _channel = WebSocketChannel.connect(wsUrl);
+    _channel!.stream.listen((message) {
+      try {
+        final data = jsonDecode(message);
+        if (data['event'] == 'QUEUE_UPDATED' || data['event'] == 'ACK') {
+          _handleRefreshQueue();
+        }
+      } catch (e) {
+        debugPrint('WebSocket parse error: $e');
+      }
+    }, onError: (error) {
+      debugPrint('WebSocket error: $error');
+    }, onDone: () {
+      debugPrint('WebSocket disconnected');
+      _channel = null;
+    });
   }
 
   Future<void> _loadQueueData() async {
@@ -48,6 +82,8 @@ class _QueueScreenState extends State<QueueScreen> {
         waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
         counterNumber: queueData['active_counters'] ?? 3,
       );
+      
+      _setupWebSocket(_booking!.centreId);
 
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {

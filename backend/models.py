@@ -17,10 +17,18 @@ class BookingStatusEnum(str, enum.Enum):
     CONFIRMED = "CONFIRMED"
     ARRIVED = "ARRIVED"
     VERIFIED = "VERIFIED"
+    WAITING = "WAITING"
+    CALLED = "CALLED"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
+    NO_SHOW = "NO_SHOW"
 
+class RoleEnum(str, enum.Enum):
+    FARMER = "FARMER"
+    CENTRE_OPERATOR = "CENTRE_OPERATOR"
+    ADMIN = "ADMIN"
+    SUPER_ADMIN = "SUPER_ADMIN"
 
 class ProcurementStatusEnum(str, enum.Enum):
     PENDING = "PENDING"
@@ -28,13 +36,11 @@ class ProcurementStatusEnum(str, enum.Enum):
     WEIGHING = "WEIGHING"
     COMPLETED = "COMPLETED"
 
-
 class PaymentStatusEnum(str, enum.Enum):
     PENDING = "PENDING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
-
 
 # ──────────────────────────────────────────────
 # Farmer
@@ -57,7 +63,6 @@ class Farmer(Base):
 
     # Relationships
     bookings = relationship("Booking", back_populates="farmer", cascade="all, delete-orphan")
-
 
 # ──────────────────────────────────────────────
 # Procurement Centre
@@ -83,7 +88,6 @@ class Centre(Base):
     slots = relationship("Slot", back_populates="centre", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="centre")
 
-
 # ──────────────────────────────────────────────
 # Slot
 # ──────────────────────────────────────────────
@@ -108,7 +112,6 @@ class Slot(Base):
         UniqueConstraint("centre_id", "date", "start_time", name="uq_centre_date_time"),
     )
 
-
 # ──────────────────────────────────────────────
 # Booking
 # ──────────────────────────────────────────────
@@ -130,6 +133,9 @@ class Booking(Base):
         default=BookingStatusEnum.CONFIRMED,
         nullable=False,
     )
+    arrival_time = Column(DateTime, nullable=True) # Track when they arrived
+    call_time = Column(DateTime, nullable=True) # Track when they were called
+    assigned_counter = Column(Integer, nullable=True) # Track which counter
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -138,7 +144,6 @@ class Booking(Base):
     slot = relationship("Slot", back_populates="bookings")
     procurement = relationship("Procurement", back_populates="booking", uselist=False, cascade="all, delete-orphan")
     payment = relationship("Payment", back_populates="booking", uselist=False, cascade="all, delete-orphan")
-
 
 # ──────────────────────────────────────────────
 # Procurement
@@ -163,7 +168,6 @@ class Procurement(Base):
     # Relationships
     booking = relationship("Booking", back_populates="procurement")
 
-
 # ──────────────────────────────────────────────
 # Payment
 # ──────────────────────────────────────────────
@@ -185,9 +189,8 @@ class Payment(Base):
     # Relationships
     booking = relationship("Booking", back_populates="payment")
 
-
 # ──────────────────────────────────────────────
-# Admin User
+# System Users (Admins/Operators)
 # ──────────────────────────────────────────────
 
 class AdminUser(Base):
@@ -196,9 +199,46 @@ class AdminUser(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     username = Column(String(50), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)
-    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False)
+    role = Column(
+        SAEnum(RoleEnum, values_callable=lambda e: [x.value for x in e]),
+        default=RoleEnum.CENTRE_OPERATOR,
+        nullable=False,
+    )
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=True) # Nullable for Master Admins
+    is_active = Column(Boolean, default=True)
+    last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     centre = relationship("Centre")
+
+# ──────────────────────────────────────────────
+# Notifications
+# ──────────────────────────────────────────────
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("farmers.id"), nullable=False) # Bound to farmers for now
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+    type = Column(String(50), default="INFO")
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+# ──────────────────────────────────────────────
+# Audit Logs
+# ──────────────────────────────────────────────
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(String(50), nullable=False) # String to handle both Farmer ID and Admin ID
+    action = Column(String(255), nullable=False)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(String(50), nullable=True)
+    ip_address = Column(String(50), nullable=True)
+    timestamp = Column(DateTime, default=datetime.utcnow)
 

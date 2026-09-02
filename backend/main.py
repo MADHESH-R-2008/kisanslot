@@ -42,6 +42,8 @@ app.include_router(booking_routes.router)
 app.include_router(queue_routes.router)
 app.include_router(procurement_routes.router)
 app.include_router(payment_routes.router)
+app.include_router(ws_routes.router)
+app.include_router(notification_routes.router)
 
 
 @app.get("/", tags=["Health"])

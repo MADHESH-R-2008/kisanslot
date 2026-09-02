@@ -79,7 +79,7 @@ def get_current_admin(
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         admin_id: Optional[int] = payload.get("sub")
         role: Optional[str] = payload.get("role")
-        if admin_id is None or role != "admin":
+        if admin_id is None or role not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN", "admin"]:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -88,5 +88,16 @@ def get_current_admin(
     if admin is None:
         raise credentials_exception
 
+    return admin
+
+def get_current_master_admin(
+    admin: AdminUser = Depends(get_current_admin),
+) -> AdminUser:
+    """Dependency for endpoints that require MASTER_ADMIN (ADMIN or SUPER_ADMIN) role."""
+    if admin.role.value not in ["ADMIN", "SUPER_ADMIN"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires Master Admin privileges."
+        )
     return admin
 

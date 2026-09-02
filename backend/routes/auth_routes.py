@@ -100,10 +100,12 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
         )
 
     # Note the 'role' field we added to the JWT payload in auth.py
-    token = create_access_token(data={"sub": str(admin.id), "role": "admin"})
+    role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
+    token = create_access_token(data={"sub": str(admin.id), "role": role_str})
 
     return AdminTokenResponse(
         access_token=token,
         centre_id=admin.centre_id,
+        role=role_str
     )
 
