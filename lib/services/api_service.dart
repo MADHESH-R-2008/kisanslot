@@ -15,8 +15,8 @@ class ApiService {
   //
   //  For Android Emulator use: http://10.0.2.2:8000
   // ──────────────────────────────────────────────
-  static const String baseUrl = 'http://192.168.31.244:8000';
-  // static const String baseUrl = 'https://kisanslot-backend.onrender.com';
+  static const String baseUrl = 'https://kisanslot-backend.onrender.com';
+  // static const String baseUrl = 'http://192.168.31.244:8000';
 
   static const _storage = FlutterSecureStorage();
   static const _tokenKey = 'jwt_token';
