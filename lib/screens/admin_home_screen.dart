@@ -87,38 +87,53 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   Widget _buildQueueCard(Map<String, dynamic> item) {
-    final status = item['status'] as String;
+    final status = (item['status'] ?? 'UNKNOWN').toString();
+    final token = item['token_number']?.toString() ?? 'N/A';
+    final bookingId = item['booking_id']?.toString() ?? 'N/A';
+    final crop = item['crop']?.toString() ?? 'N/A';
+    final quantity = item['quantity']?.toString() ?? 'N/A';
+    final vehicle = item['vehicle_number']?.toString() ?? 'N/A';
+
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min, // Ensure Column doesn't expand infinitely
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Token: #${item['token_number']}',
+                  'Token: #$token',
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
-                Chip(
-                  label: Text(status),
-                  backgroundColor: _getStatusColor(status).withOpacity(0.1),
-                  labelStyle: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.bold),
-                )
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(status).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    status,
+                    style: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.bold),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Booking ID: ${item['booking_id']}'),
-            Text('Crop: ${item['crop']} (${item['quantity']} kg)'),
-            Text('Vehicle: ${item['vehicle_number']}'),
+            Text('Booking ID: $bookingId'),
+            Text('Crop: $crop ($quantity kg)'),
+            Text('Vehicle: $vehicle'),
             const SizedBox(height: 16),
             const Divider(),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: _buildActionButtons(item['booking_id'], status),
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              children: _buildActionButtons(bookingId, status),
             )
           ],
         ),
