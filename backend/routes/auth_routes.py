@@ -103,7 +103,11 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
 
     # Note the 'role' field we added to the JWT payload in auth.py
     role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
-    token = create_access_token(data={"sub": str(admin.id), "role": role_str})
+    token = create_access_token(data={
+        "sub": str(admin.id),
+        "role": role_str,
+        "centre_id": admin.centre_id,
+    })
 
     return AdminTokenResponse(
         access_token=token,
@@ -136,8 +140,11 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
         if not verify_password(req.password, admin.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for admin account.")
         role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
-        token = create_access_token(data={"sub": str(admin.id), "role": role_str})
+        token = create_access_token(data={
+            "sub": str(admin.id),
+            "role": role_str,
+            "centre_id": admin.centre_id,
+        })
         return AdminTokenResponse(access_token=token, centre_id=admin.centre_id, role=role_str)
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide either mobile (farmer) or username (admin) for login.")
-

@@ -13,6 +13,10 @@ const CentreModal = ({ centre, onClose, onSave }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (form.active_counters > form.total_counters) {
+      window.alert('Active counters cannot be greater than total counters.');
+      return;
+    }
     onSave(form);
   };
 
@@ -45,9 +49,9 @@ const CentreModal = ({ centre, onClose, onSave }) => {
           <div style={{ gridColumn: '1 / -1' }}>{field('Centre Name *', 'name', 'text', { required: true })}</div>
           {field('Centre Code *', 'code', 'text', { required: true })}
           {field('Contact Number', 'contact_number')}
-          <div style={{ gridColumn: '1 / -1' }}>{field('Address', 'address')}</div>
-          {field('District', 'district')}
-          {field('State', 'state')}
+          <div style={{ gridColumn: '1 / -1' }}>{field('Address *', 'address', 'text', { required: true })}</div>
+          {field('District *', 'district', 'text', { required: true })}
+          {field('State *', 'state', 'text', { required: true })}
           {field('Total Counters', 'total_counters', 'number', { min: 1 })}
           {field('Active Counters', 'active_counters', 'number', { min: 0 })}
           {field('Is Active', 'is_active', 'checkbox', { checkLabel: 'Centre is active' })}
@@ -67,6 +71,8 @@ const Centres = () => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'create' | centre object
   const role = localStorage.getItem('role');
+  const assignedCentreId = Number(localStorage.getItem('centre_id'));
+  const canCreateCentres = role === 'ADMIN' || role === 'SUPER_ADMIN';
   const isSuperAdmin = role === 'SUPER_ADMIN';
 
   const fetchCentres = async () => {
@@ -93,7 +99,13 @@ const Centres = () => {
       setModal(null);
       fetchCentres();
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to save centre');
+      const detail = err.response?.data?.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((item) => `${item.loc?.slice(-1)[0] || 'Field'}: ${item.msg}`).join('\n')
+        : detail;
+      alert(message || (err.response?.status === 403
+        ? 'You need an Admin or Super Admin account to create a centre.'
+        : 'Failed to save centre. Check your connection and try again.'));
     }
   };
 
@@ -113,14 +125,21 @@ const Centres = () => {
         <div>
           <h2 style={{ margin: 0 }}>Centres</h2>
           <p style={{ color: 'var(--text-secondary)', margin: '0.25rem 0 0' }}>Manage procurement centres</p>
+          {!canCreateCentres && (
+            <p style={{ color: 'var(--text-secondary)', margin: '0.5rem 0 0', fontSize: '0.82rem' }}>
+              Centre operators can update only their assigned centre. Sign in as an Admin or Super Admin to create a centre.
+            </p>
+          )}
         </div>
         <div style={{ display: 'flex', gap: '0.75rem' }}>
           <button className="btn btn-secondary" onClick={fetchCentres} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
             <RefreshCw size={16} /> Refresh
           </button>
-          <button className="btn btn-primary" onClick={() => setModal('create')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-            <Plus size={16} /> Add Centre
-          </button>
+          {canCreateCentres && (
+            <button className="btn btn-primary" onClick={() => setModal('create')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Plus size={16} /> Add Centre
+            </button>
+          )}
         </div>
       </div>
 
@@ -150,9 +169,11 @@ const Centres = () => {
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>Code: {c.code}</div>
                 </div>
                 <div style={{ display: 'flex', gap: '0.35rem' }}>
-                  <button onClick={() => setModal(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0.25rem' }} title="Edit">
-                    <Edit2 size={16} />
-                  </button>
+                  {(role !== 'CENTRE_OPERATOR' || c.id === assignedCentreId) && (
+                    <button onClick={() => setModal(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0.25rem' }} title="Edit">
+                      <Edit2 size={16} />
+                    </button>
+                  )}
                   {isSuperAdmin && (
                     <button onClick={() => handleDelete(c.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-color)', padding: '0.25rem' }} title="Delete">
                       <Trash2 size={16} />

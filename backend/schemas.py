@@ -82,11 +82,14 @@ class FarmerUpdateRequest(BaseModel):
 class CentreResponse(BaseModel):
     id: int
     name: str
+    code: str
     address: str
     district: str
     state: str
+    contact_number: Optional[str] = None
     latitude: float
     longitude: float
+    total_counters: int
     active_counters: int
     is_active: bool
     is_paused: bool = False
@@ -116,6 +119,7 @@ class CentreCreateRequest(BaseModel):
 
 class CentreUpdateRequest(BaseModel):
     name: Optional[str] = None
+    code: Optional[str] = None
     address: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None

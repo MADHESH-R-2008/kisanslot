@@ -1,8 +1,8 @@
 import os
 from sqlalchemy import create_engine, text
 
-# Get DB URL
-DATABASE_URL = "mysql+pymysql://osia0r0lqr1aakbl_manoj:Manoj%40007@cpanel358-az.turbify.biz:3306/osia0r0lqr1aakbl_KISAN"
+# Read the cloud database URL from the environment; never commit credentials.
+DATABASE_URL = os.environ["DATABASE_URL"]
 engine = create_engine(DATABASE_URL)
 
 with engine.connect() as conn:

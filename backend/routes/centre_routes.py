@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -24,7 +25,10 @@ def create_centre(
 ):
     # Ensure the caller has sufficient role
     if admin.get("role") not in [RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient permissions")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only Admin or Super Admin accounts can create centres",
+        )
     centre = Centre(
         name=payload.name,
         code=payload.code,
@@ -42,7 +46,14 @@ def create_centre(
         rating=payload.rating,
     )
     db.add(centre)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A centre with this code already exists",
+        )
     db.refresh(centre)
     return centre
 
@@ -61,7 +72,14 @@ def update_centre(
     # Apply only the fields supplied by the client
     for attr, value in payload.dict(exclude_unset=True).items():
         setattr(centre, attr, value)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A centre with this code already exists",
+        )
     db.refresh(centre)
     return centre
 
