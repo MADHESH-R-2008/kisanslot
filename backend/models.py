@@ -19,10 +19,12 @@ class BookingStatusEnum(str, enum.Enum):
     VERIFIED = "VERIFIED"
     WAITING = "WAITING"
     CALLED = "CALLED"
+    SERVING = "SERVING"
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
     NO_SHOW = "NO_SHOW"
+    SKIPPED = "SKIPPED"
 
 class RoleEnum(str, enum.Enum):
     FARMER = "FARMER"
@@ -147,7 +149,10 @@ class Booking(Base):
     arrival_time = Column(DateTime, nullable=True) # Track when they arrived
     call_time = Column(DateTime, nullable=True) # Track when they were called
     assigned_counter = Column(Integer, nullable=True) # Track which counter
+    serving_at = Column(DateTime, nullable=True)  # Phase 3.2: when serving started
+    completed_at = Column(DateTime, nullable=True)  # Phase 3.2: when completed
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
     # Relationships
@@ -262,6 +267,7 @@ class AuditLog(Base):
 class CounterStatusEnum(str, enum.Enum):
     ACTIVE = "ACTIVE"
     INACTIVE = "INACTIVE"
+    BUSY = "BUSY"
     MAINTENANCE = "MAINTENANCE"
 
 class Counter(Base):
@@ -275,6 +281,8 @@ class Counter(Base):
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    current_booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True)  # Phase 3.2
 
     centre = relationship("Centre", back_populates="counters")
+    current_booking = relationship("Booking", foreign_keys=[current_booking_id])
 

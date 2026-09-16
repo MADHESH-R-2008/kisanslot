@@ -1,10 +1,14 @@
 enum BookingStatus {
   confirmed,
   inQueue,
+  called,
+  serving,
   atCounter,
   procuring,
   completed,
   cancelled,
+  noShow,
+  skipped,
 }
 
 enum PaymentStatus {
@@ -17,6 +21,7 @@ enum PaymentStatus {
 class BookingModel {
   final String bookingId;
   final int tokenNumber;
+  final String tokenDisplay; // Phase 3.2
   final int centreId;
   final String centreName;
   final String date;
@@ -26,7 +31,8 @@ class BookingModel {
   final String vehicleNumber;
   final int queuePosition;
   final int farmersAhead;
-  final int counterNumber;
+  final int counterNumber; // Active counters
+  final String? assignedCounterName; // Phase 3.2
   final int waitTimeMinutes;
   final BookingStatus status;
   final int currentProcurementStep; // 0 to 6 (7 steps)
@@ -39,6 +45,7 @@ class BookingModel {
   const BookingModel({
     required this.bookingId,
     required this.tokenNumber,
+    this.tokenDisplay = '',
     required this.centreId,
     required this.centreName,
     required this.date,
@@ -49,6 +56,7 @@ class BookingModel {
     required this.queuePosition,
     required this.farmersAhead,
     required this.counterNumber,
+    this.assignedCounterName,
     required this.waitTimeMinutes,
     this.status = BookingStatus.inQueue,
     this.currentProcurementStep = 3, // Step 4: Weighing
@@ -56,7 +64,7 @@ class BookingModel {
     this.ratePerKg = 21.50,
     this.totalAmount = 18275.00,
     this.expectedPaymentDate = '27 August 2026',
-    this.bankAccountHint = 'SBI •••• 4921',
+    this.bankAccountHint = 'SBI ••• 4921',
   });
 
   /// Create from booking detail API response
@@ -68,10 +76,15 @@ class BookingModel {
         bookingStatus = BookingStatus.confirmed;
         break;
       case 'ARRIVED':
+      case 'VERIFIED':
+      case 'WAITING':
         bookingStatus = BookingStatus.inQueue;
         break;
-      case 'VERIFIED':
-        bookingStatus = BookingStatus.atCounter;
+      case 'CALLED':
+        bookingStatus = BookingStatus.called;
+        break;
+      case 'SERVING':
+        bookingStatus = BookingStatus.serving;
         break;
       case 'PROCESSING':
         bookingStatus = BookingStatus.procuring;
@@ -82,6 +95,12 @@ class BookingModel {
       case 'CANCELLED':
         bookingStatus = BookingStatus.cancelled;
         break;
+      case 'NO_SHOW':
+        bookingStatus = BookingStatus.noShow;
+        break;
+      case 'SKIPPED':
+        bookingStatus = BookingStatus.skipped;
+        break;
       default:
         bookingStatus = BookingStatus.confirmed;
     }
@@ -89,6 +108,7 @@ class BookingModel {
     return BookingModel(
       bookingId: json['booking_id'] ?? '',
       tokenNumber: json['token_number'] ?? 0,
+      tokenDisplay: json['token_display'] ?? '',
       centreId: json['centre_id'] ?? 0,
       centreName: json['centre'] ?? '',
       date: json['date'] ?? '',
@@ -99,6 +119,7 @@ class BookingModel {
       queuePosition: json['queue_position'] ?? 0,
       farmersAhead: json['farmers_ahead'] ?? 0,
       counterNumber: json['active_counters'] ?? 3,
+      assignedCounterName: json['counter_name'],
       waitTimeMinutes: json['estimated_wait_minutes'] ?? 0,
       status: bookingStatus,
     );
@@ -109,6 +130,7 @@ class BookingModel {
     return BookingModel(
       bookingId: json['booking_id'] ?? '',
       tokenNumber: json['token_number'] ?? 0,
+      tokenDisplay: json['token_display'] ?? '',
       centreId: 0,
       centreName: json['centre'] ?? '',
       date: json['date'] ?? '',
@@ -119,6 +141,7 @@ class BookingModel {
       queuePosition: json['token_number'] ?? 0,
       farmersAhead: (json['token_number'] ?? 1) - 1,
       counterNumber: 3,
+      assignedCounterName: null,
       waitTimeMinutes: 0,
       status: BookingStatus.confirmed,
     );
@@ -127,6 +150,7 @@ class BookingModel {
   BookingModel copyWith({
     String? bookingId,
     int? tokenNumber,
+    String? tokenDisplay,
     int? centreId,
     String? centreName,
     String? date,
@@ -137,6 +161,7 @@ class BookingModel {
     int? queuePosition,
     int? farmersAhead,
     int? counterNumber,
+    String? assignedCounterName,
     int? waitTimeMinutes,
     BookingStatus? status,
     int? currentProcurementStep,
@@ -149,6 +174,7 @@ class BookingModel {
     return BookingModel(
       bookingId: bookingId ?? this.bookingId,
       tokenNumber: tokenNumber ?? this.tokenNumber,
+      tokenDisplay: tokenDisplay ?? this.tokenDisplay,
       centreId: centreId ?? this.centreId,
       centreName: centreName ?? this.centreName,
       date: date ?? this.date,
@@ -159,6 +185,7 @@ class BookingModel {
       queuePosition: queuePosition ?? this.queuePosition,
       farmersAhead: farmersAhead ?? this.farmersAhead,
       counterNumber: counterNumber ?? this.counterNumber,
+      assignedCounterName: assignedCounterName ?? this.assignedCounterName,
       waitTimeMinutes: waitTimeMinutes ?? this.waitTimeMinutes,
       status: status ?? this.status,
       currentProcurementStep: currentProcurementStep ?? this.currentProcurementStep,
@@ -174,6 +201,7 @@ class BookingModel {
     return const BookingModel(
       bookingId: 'KS1025',
       tokenNumber: 17,
+      tokenDisplay: 'C002-017',
       centreId: 2,
       centreName: 'Centre B',
       date: '25 August 2026',
@@ -184,6 +212,7 @@ class BookingModel {
       queuePosition: 17,
       farmersAhead: 16,
       counterNumber: 3,
+      assignedCounterName: null,
       waitTimeMinutes: 45,
       status: BookingStatus.inQueue,
       currentProcurementStep: 3, // Weighing (🟡)

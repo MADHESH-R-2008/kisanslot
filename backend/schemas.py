@@ -193,28 +193,51 @@ class BookingDetailResponse(BaseModel):
 
 class QueueResponse(BaseModel):
     booking_id: str
+    token_display: str = ""
     queue_position: int
     farmers_ahead: int
     estimated_wait_minutes: int
     active_counters: int
     status: str
+    assigned_counter: Optional[int] = None
+    counter_name: Optional[str] = None
 
 class QueueEntry(BaseModel):
     token: int
+    token_display: str = ""
     booking_id: str
     farmer_name: str
     status: str
     arrival_time: Optional[datetime] = None
     queue_position: Optional[int] = None
+    assigned_counter: Optional[int] = None
+    counter_name: Optional[str] = None
+    estimated_wait_minutes: Optional[int] = None
 
 class CentreQueueStatusResponse(BaseModel):
     centre_id: int
     waiting_count: int
     processing_count: int
+    serving_count: int = 0
     completed_count: int
+    skipped_count: int = 0
+    cancelled_count: int = 0
     active_counters: int
     is_paused: bool = False
     queue: list[QueueEntry]
+
+class QueueStatsResponse(BaseModel):
+    centre_id: int
+    total_bookings: int = 0
+    waiting: int = 0
+    serving: int = 0
+    completed: int = 0
+    skipped: int = 0
+    cancelled: int = 0
+    no_show: int = 0
+    active_counters: int = 0
+    average_processing_minutes: float = 0.0
+    average_wait_minutes: float = 0.0
 
 # ──────────────────────────────────────────────
 # Procurement Schemas
@@ -262,6 +285,9 @@ class CounterResponse(BaseModel):
     name: str
     status: str
     is_available: bool
+    current_booking_id: Optional[int] = None
+    current_farmer_name: Optional[str] = None
+    current_token_display: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,17 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Farmer, Booking, Slot, Centre, BookingStatusEnum
 from schemas import BookingCreateRequest, BookingResponse, BookingDetailResponse
 from auth import get_current_farmer
-from services.booking_service import generate_booking_id, generate_token_number
+from services.booking_service import generate_booking_id, generate_token_number, format_token_display
+from services.notification_service import send_notification
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
-def create_booking(
+async def create_booking(
     req: BookingCreateRequest,
     farmer: Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
@@ -69,7 +70,7 @@ def create_booking(
 
     # 6. Generate booking ID and token number
     booking_id = generate_booking_id(db)
-    token_number = generate_token_number(db, req.slot_id)
+    token_number = generate_token_number(db, req.slot_id, centre_id=req.centre_id)
 
     # 7. Create booking
     booking = Booking(
@@ -108,6 +109,33 @@ def create_booking(
     db.add(procurement)
     db.add(payment)
     db.commit()
+
+    # 10. Send notification to farmer
+    try:
+        token_display = format_token_display(req.centre_id, token_number)
+        send_notification(
+            db,
+            user_id=farmer.id,
+            title="📅 Booking Confirmed",
+            message=f"Token {token_display} confirmed at {centre.name} for {slot.date.strftime('%d %b %Y')} {slot.start_time.strftime('%H:%M')}-{slot.end_time.strftime('%H:%M')}.",
+            type_str="BOOKING_CONFIRMED",
+        )
+    except Exception:
+        pass
+
+    # 11. Broadcast queue update via WebSocket
+    try:
+        from routes.ws_routes import manager
+        import json
+        await manager.broadcast({
+            "event": "BOOKING_CREATED",
+            "centre_id": req.centre_id,
+            "token": token_number,
+            "token_display": format_token_display(req.centre_id, token_number),
+            "booking_id": booking.booking_id,
+        }, req.centre_id)
+    except Exception:
+        pass
 
     return BookingResponse(
         booking_id=booking.booking_id,

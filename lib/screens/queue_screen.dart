@@ -81,6 +81,9 @@ class _QueueScreenState extends State<QueueScreen> {
         farmersAhead: queueData['farmers_ahead'] ?? 0,
         waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
         counterNumber: queueData['active_counters'] ?? 3,
+        status: _parseStatus(queueData['status']),
+        assignedCounterName: queueData['counter_name'],
+        tokenDisplay: queueData['token_display'] ?? '',
       );
       
       _setupWebSocket(_booking!.centreId);
@@ -112,21 +115,36 @@ class _QueueScreenState extends State<QueueScreen> {
         farmersAhead: ahead,
         waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
         counterNumber: queueData['active_counters'] ?? 3,
+        status: _parseStatus(queueData['status']),
+        assignedCounterName: queueData['counter_name'],
+        tokenDisplay: queueData['token_display'] ?? '',
       );
 
       if (mounted) {
         setState(() => _isRefreshing = false);
 
-        final isTurn = pos <= 1;
+        final bool isTurn = _booking!.status == BookingStatus.called || _booking!.status == BookingStatus.serving || pos <= 1;
+        String message;
+        Color bgColor = AppColors.primary;
+        
+        if (_booking!.status == BookingStatus.called) {
+          message = '🔊 YOUR TOKEN IS CALLED! Proceed to ${_booking!.assignedCounterName ?? "the counter"}.';
+          bgColor = const Color(0xFF8B5CF6);
+        } else if (_booking!.status == BookingStatus.serving) {
+          message = '🟢 Currently Serving at ${_booking!.assignedCounterName ?? "the counter"}.';
+          bgColor = const Color(0xFF10B981);
+        } else if (isTurn) {
+          message = '🎉 It is almost YOUR TURN!';
+          bgColor = AppColors.success;
+        } else {
+          message = 'Queue updated: Position #$pos ($ahead farmers ahead)';
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              isTurn
-                  ? '🎉 It is YOUR TURN! Please proceed to the counter.'
-                  : 'Queue updated: Position #$pos ($ahead farmers ahead)',
-            ),
-            backgroundColor: isTurn ? AppColors.success : AppColors.primary,
-            duration: const Duration(seconds: 2),
+            content: Text(message),
+            backgroundColor: bgColor,
+            duration: const Duration(seconds: 4),
           ),
         );
       }
@@ -140,6 +158,25 @@ class _QueueScreenState extends State<QueueScreen> {
           ),
         );
       }
+    }
+  }
+
+  BookingStatus _parseStatus(dynamic statusStr) {
+    if (statusStr == null) return BookingStatus.inQueue;
+    final s = statusStr.toString().toUpperCase();
+    switch (s) {
+      case 'CONFIRMED': return BookingStatus.confirmed;
+      case 'ARRIVED':
+      case 'VERIFIED':
+      case 'WAITING': return BookingStatus.inQueue;
+      case 'CALLED': return BookingStatus.called;
+      case 'SERVING': return BookingStatus.serving;
+      case 'PROCESSING': return BookingStatus.procuring;
+      case 'COMPLETED': return BookingStatus.completed;
+      case 'CANCELLED': return BookingStatus.cancelled;
+      case 'NO_SHOW': return BookingStatus.noShow;
+      case 'SKIPPED': return BookingStatus.skipped;
+      default: return BookingStatus.inQueue;
     }
   }
 

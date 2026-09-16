@@ -313,6 +313,15 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  /// Cancel a booking.
+  static Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
+    final response = await http.post(
+      Uri.parse('$baseUrl/api/queue/booking/$bookingId/cancel'),
+      headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
   // ──────────────────────────────────────────────
   //  Queue APIs
   // ──────────────────────────────────────────────
@@ -377,6 +386,37 @@ class ApiService {
   static Future<Map<String, dynamic>> getPayment(String bookingId) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/payments/$bookingId'),
+      headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  // ──────────────────────────────────────────────
+  //  Notifications APIs
+  // ──────────────────────────────────────────────
+
+  /// Get notifications for logged-in user.
+  static Future<List<dynamic>> getNotifications() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/notifications/'),
+      headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Mark notification as read.
+  static Future<Map<String, dynamic>> markNotificationRead(int id) async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/notifications/$id/read'),
+      headers: await _authHeaders(),
+    );
+    return _handleResponse(response);
+  }
+
+  /// Mark all notifications as read.
+  static Future<Map<String, dynamic>> markAllNotificationsRead() async {
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/notifications/read-all'),
       headers: await _authHeaders(),
     );
     return _handleResponse(response);

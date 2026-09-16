@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'dart:convert';
 import '../models/farmer.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
@@ -19,11 +21,54 @@ class _HomeScreenState extends State<HomeScreen> {
   BookingModel? _activeBooking;
   bool _isLoading = true;
   String? _error;
+  WebSocketChannel? _channel;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _channel?.sink.close();
+    super.dispose();
+  }
+
+  void _setupWebSocket(int centreId) {
+    if (_channel != null) return;
+    
+    final wsBase = ApiService.baseUrl.replaceFirst('http', 'ws');
+    final wsUrl = Uri.parse('$wsBase/ws/queue/$centreId');
+    
+    _channel = WebSocketChannel.connect(wsUrl);
+    _channel!.stream.listen((message) {
+      try {
+        final data = jsonDecode(message);
+        if (data['event'] == 'QUEUE_UPDATED' || data['event'] == 'ACK') {
+          // Soft refresh queue data
+          _refreshQueueSilent();
+        }
+      } catch (e) {
+        debugPrint('WebSocket parse error: $e');
+      }
+    });
+  }
+
+  Future<void> _refreshQueueSilent() async {
+    if (_activeBooking == null) return;
+    try {
+      final queueData = await ApiService.getQueue(_activeBooking!.bookingId);
+      if (mounted) {
+        setState(() {
+          _activeBooking = _activeBooking!.copyWith(
+            queuePosition: queueData['queue_position'] ?? 0,
+            farmersAhead: queueData['farmers_ahead'] ?? 0,
+            waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
+          );
+        });
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -53,6 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
               waitTimeMinutes: queueData['estimated_wait_minutes'] ?? 0,
             );
           } catch (_) {}
+          
+          _setupWebSocket(_activeBooking!.centreId);
+        } else {
+          // No booking, close WS if open
+          _channel?.sink.close();
+          _channel = null;
         }
       } catch (_) {
         // No active booking, that's fine

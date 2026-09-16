@@ -67,7 +67,7 @@ class BookingCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    'Token #${booking.tokenNumber}',
+                    booking.tokenDisplay.isNotEmpty ? booking.tokenDisplay : 'Token #${booking.tokenNumber}',
                     style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.bold,

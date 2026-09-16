@@ -33,6 +33,7 @@ export const authAPI = {
 // ── Queue ─────────────────────────────────────────────────────────────────────
 export const queueAPI = {
   getCentreStatus: (centreId) => api.get(`/queue/centre/${centreId}/status`),
+  getQueueStats: (centreId) => api.get(`/queue/centre/${centreId}/stats`),
   getAdminList: () => api.get('/queue/admin/list'),
   callNext: () => api.post('/queue/admin/queue/next'),
   pauseQueue: () => api.post('/queue/admin/queue/pause'),
@@ -43,6 +44,8 @@ export const queueAPI = {
     api.post(`/queue/admin/booking/${bookingId}/complete`),
   markNoShow: (bookingId) =>
     api.post(`/queue/admin/booking/${bookingId}/no_show`),
+  skipFarmer: (bookingId) =>
+    api.post(`/queue/admin/booking/${bookingId}/skip`),
   updateStatus: (bookingId, status) =>
     api.put(`/queue/admin/booking/${bookingId}/status`, { status }),
 };
@@ -58,8 +61,10 @@ export const centreAPI = {
 // ── Counters ──────────────────────────────────────────────────────────────────
 export const counterAPI = {
   list: () => api.get('/counters/'),
+  listByCentre: (centreId) => api.get(`/counters/centre/${centreId}`),
   create: (data) => api.post('/counters/', data),
   update: (id, data) => api.put(`/counters/${id}`, data),
+  toggle: (id) => api.put(`/counters/${id}/toggle`),
   remove: (id) => api.delete(`/counters/${id}`),
 };
 
