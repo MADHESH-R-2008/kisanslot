@@ -35,24 +35,24 @@ def get_db():
 def ensure_schema_up_to_date(bind_engine):
     """Safely auto-migrate missing columns for MySQL/PostgreSQL/SQLite."""
     from sqlalchemy import text
-    migrations = [
-        ("centres", "contact_number", "VARCHAR(20)", "NULL"),
-        ("centres", "is_paused", "BOOLEAN", "FALSE"),
-        ("centres", "total_counters", "INT", "3"),
-        ("centres", "active_counters", "INT", "3"),
-        ("centres", "distance_km", "FLOAT", "0.0"),
-        ("centres", "rating", "FLOAT", "4.5"),
-        ("bookings", "assigned_counter", "INT", "NULL"),
-        ("bookings", "call_time", "DATETIME", "NULL"),
-        ("bookings", "serving_at", "DATETIME", "NULL"),
-        ("bookings", "completed_at", "DATETIME", "NULL"),
-        ("bookings", "token_display", "VARCHAR(50)", "''"),
+    statements = [
+        "ALTER TABLE centres ADD contact_number VARCHAR(20)",
+        "ALTER TABLE centres ADD is_paused BOOLEAN",
+        "ALTER TABLE centres ADD total_counters INT",
+        "ALTER TABLE centres ADD active_counters INT",
+        "ALTER TABLE centres ADD distance_km FLOAT",
+        "ALTER TABLE centres ADD rating FLOAT",
+        "ALTER TABLE bookings ADD assigned_counter INT",
+        "ALTER TABLE bookings ADD call_time DATETIME",
+        "ALTER TABLE bookings ADD serving_at DATETIME",
+        "ALTER TABLE bookings ADD completed_at DATETIME",
+        "ALTER TABLE bookings ADD token_display VARCHAR(50)",
     ]
 
     with bind_engine.connect() as conn:
-        for table, column, col_type, default in migrations:
+        for stmt in statements:
             try:
-                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type} DEFAULT {default};"))
+                conn.execute(text(stmt))
                 conn.commit()
             except Exception:
                 pass

@@ -364,9 +364,12 @@ def _create_counters(db, centres):
 
 def _ensure_centres(db):
     """Ensure centres exist in database."""
-    centres = db.query(Centre).all()
-    if centres:
-        return centres
+    try:
+        centres = db.query(Centre).all()
+        if centres:
+            return centres
+    except Exception:
+        db.rollback()
 
     print("[INFO] No centres found. Seeding default centres...")
     centres = [
