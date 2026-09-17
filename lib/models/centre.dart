@@ -47,22 +47,44 @@ class ProcurementCentre {
     );
   }
 
+  static double _parseDouble(dynamic val, double fallback) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val) ?? fallback;
+    return fallback;
+  }
+
+  static double? _parseOptionalDouble(dynamic val) {
+    if (val == null) return null;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val);
+    return null;
+  }
+
+  static int _parseInt(dynamic val, int fallback) {
+    if (val == null) return fallback;
+    if (val is int) return val;
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val) ?? fallback;
+    return fallback;
+  }
+
   factory ProcurementCentre.fromJson(Map<String, dynamic> json) {
-    final qCount = json['queue_count'] ?? 0;
+    final qCount = _parseInt(json['queue_count'], 0);
     return ProcurementCentre(
-      id: json['id'],
-      name: json['name'] ?? '',
-      distanceKm: (json['distance_km'] ?? json['distance'] ?? 0).toDouble(),
+      id: _parseInt(json['id'], 0),
+      name: (json['name'] ?? '').toString(),
+      distanceKm: _parseDouble(json['distance_km'] ?? json['distance'], 0.0),
       queueCount: qCount,
-      waitMin: json['estimated_wait_minutes'] ?? 0,
+      waitMin: _parseInt(json['estimated_wait_minutes'], 0),
       isRecommended: qCount <= 10,  // Auto-recommend if queue is short
-      address: json['address'] ?? '',
-      isOpen: json['is_active'] ?? true,
-      activeCounters: json['active_counters'] ?? 3,
-      rating: (json['rating'] ?? 4.5).toDouble(),
-      googleMapUrl: json['google_map_url'],
-      latitude: (json['latitude'] != null) ? (json['latitude'] as num).toDouble() : null,
-      longitude: (json['longitude'] != null) ? (json['longitude'] as num).toDouble() : null,
+      address: (json['address'] ?? '').toString(),
+      isOpen: json['is_active'] == true || json['is_active'] == 1 || json['is_active'] == null,
+      activeCounters: _parseInt(json['active_counters'], 3),
+      rating: _parseDouble(json['rating'], 4.5),
+      googleMapUrl: json['google_map_url']?.toString(),
+      latitude: _parseOptionalDouble(json['latitude']),
+      longitude: _parseOptionalDouble(json['longitude']),
     );
   }
 

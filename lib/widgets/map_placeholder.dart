@@ -169,29 +169,34 @@ class MapPlaceholderWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: isRec ? AppColors.secondary : (isSelected ? AppColors.primary : Colors.white),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: isRec ? AppColors.secondaryDark : AppColors.primary,
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 110),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+              decoration: BoxDecoration(
+                color: isRec ? AppColors.secondary : (isSelected ? AppColors.primary : Colors.white),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isRec ? AppColors.secondaryDark : AppColors.primary,
+                  width: 1.2,
                 ),
-              ],
-            ),
-            child: Text(
-              isRec ? '⭐ ${centre.name}' : centre.name,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: (isRec || isSelected) ? Colors.white : AppColors.textPrimary,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.12),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                isRec ? '⭐ ${centre.name}' : centre.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: (isRec || isSelected) ? Colors.white : AppColors.textPrimary,
+                ),
               ),
             ),
           ),
