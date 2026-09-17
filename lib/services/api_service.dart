@@ -315,8 +315,8 @@ class ApiService {
 
   /// Cancel a booking.
   static Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
-    final response = await http.post(
-      Uri.parse('$baseUrl/api/queue/booking/$bookingId/cancel'),
+    final response = await http.put(
+      Uri.parse('$baseUrl/api/bookings/$bookingId/cancel'),
       headers: await _authHeaders(),
     );
     return _handleResponse(response);
@@ -361,7 +361,7 @@ class ApiService {
   /// Get procurement status for a booking.
   static Future<Map<String, dynamic>> getProcurement(String bookingId) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/procurement/admin/$bookingId'),
+      Uri.parse('$baseUrl/api/procurement/$bookingId'),
       headers: await _authHeaders(),
     );
     return _handleResponse(response);

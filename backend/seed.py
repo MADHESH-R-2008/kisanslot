@@ -4,11 +4,20 @@ Populates test data: farmer, centres, slots, sample bookings, counters, and queu
 Run: python seed.py
 """
 
+import sys
+import io
+
+# Ensure UTF-8 stdout encoding for Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+else:
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
 from datetime import date, time, datetime, timedelta
 from database import SessionLocal, engine, Base
 from models import (
     Farmer, Centre, Slot, Booking, Procurement, Payment, AdminUser, Counter, Notification,
-    BookingStatusEnum, ProcurementStatusEnum, PaymentStatusEnum, CounterStatusEnum,
+    BookingStatusEnum, ProcurementStatusEnum, PaymentStatusEnum, CounterStatusEnum, RoleEnum,
 )
 from auth import hash_password
 
@@ -21,13 +30,14 @@ def seed():
 
     try:
         # ─── Check if already seeded ─────────────────────────
-        existing_farmer = db.query(Farmer).filter(Farmer.mobile == "9876543210").first()
+        existing_farmer = db.query(Farmer).filter(Farmer.mobile == "9999999999").first()
         if existing_farmer:
-            print("⚠️  Database already seeded. Skipping core data.")
+            print("[INFO] Database already seeded. Verifying today's slots & demo queue.")
             print(f"   Test Farmer: {existing_farmer.name} ({existing_farmer.mobile})")
             print(f"   Password: 123456")
 
-            # Still ensure today's slots and counters exist
+            # Always ensure centres, today's slots and counters exist
+            _ensure_centres(db)
             _ensure_today_slots(db)
             _ensure_counters(db)
             _ensure_queue_demo_data(db, existing_farmer)
@@ -38,18 +48,32 @@ def seed():
         # ─── Farmer ─────────────────────────────────────────
         farmer = Farmer(
             name="Ravi Kumar",
-            mobile="9876543210",
+            mobile="9999999999",
             farmer_id="FR10245",
             village="Example Village",
-            district="Example District",
-            state="Tamil Nadu",
+            district="District 1",
+            state="State X",
             crop="Paddy",
             expected_quantity=850.0,
-            password_hash=hash_password("123456"),
+            password_hash=hash_password("farmer123"),
         )
         db.add(farmer)
         db.flush()  # Get the farmer.id
-        print(f"   ✅ Farmer: {farmer.name} (Mobile: {farmer.mobile}, Password: 123456)")
+        print(f"   ✅ Primary Test Farmer: {farmer.name} (Mobile: {farmer.mobile}, Password: farmer123)")
+
+        # Secondary test farmer for backward compat if needed
+        farmer2 = Farmer(
+            name="Ravi Kumar (Alt)",
+            mobile="9876543210",
+            farmer_id="FR10246",
+            village="Example Village",
+            district="District 1",
+            state="State X",
+            crop="Paddy",
+            expected_quantity=500.0,
+            password_hash=hash_password("123456"),
+        )
+        db.add(farmer2)
 
         # ─── Additional test farmers for queue demo ──────────
         demo_farmers = []
@@ -59,8 +83,8 @@ def seed():
                 mobile=f"900000000{i}",
                 farmer_id=f"FD{10000+i}",
                 village=f"Village {i}",
-                district="Example District",
-                state="Tamil Nadu",
+                district="District 1",
+                state="State X",
                 crop=["Paddy", "Wheat", "Cotton", "Sugarcane", "Maize", "Rice", "Sorghum", "Groundnut"][i-1],
                 expected_quantity=100.0 * i,
                 password_hash=hash_password("demo123"),
@@ -76,11 +100,12 @@ def seed():
                 name="Centre A",
                 code="CTR-A",
                 address="APMC Market Yard, North Block, Main Road",
-                district="Example District",
-                state="Tamil Nadu",
+                district="District 1",
+                state="State X",
                 latitude=11.0168,
                 longitude=76.9558,
-                active_counters=4,
+                total_counters=3,
+                active_counters=3,
                 is_active=True,
                 distance_km=4.0,
                 rating=4.2,
@@ -89,11 +114,12 @@ def seed():
                 name="Centre B",
                 code="CTR-B",
                 address="Taluk Regulated Agricultural Market, Highway Junction",
-                district="Example District",
-                state="Tamil Nadu",
+                district="District 2",
+                state="State X",
                 latitude=11.0245,
                 longitude=76.9612,
-                active_counters=3,
+                total_counters=2,
+                active_counters=2,
                 is_active=True,
                 distance_km=7.0,
                 rating=4.9,
@@ -102,11 +128,12 @@ def seed():
                 name="Centre C",
                 code="CTR-C",
                 address="District Farmers Co-operative Hub, Sector 4",
-                district="Example District",
-                state="Tamil Nadu",
+                district="District 3",
+                state="State Y",
                 latitude=11.0312,
                 longitude=76.9701,
-                active_counters=2,
+                total_counters=4,
+                active_counters=4,
                 is_active=True,
                 distance_km=10.0,
                 rating=4.5,
@@ -117,40 +144,32 @@ def seed():
         print(f"   ✅ Centres: {len(centres)} centres created")
 
         # ─── Admin Users ───────────────────────────────────────
-        operator = AdminUser(
-            username="admin",
-            password_hash=hash_password("admin123"),
-            centre_id=centres[0].id,
-            role="CENTRE_OPERATOR"
-        )
-        # Phase 3.1 required accounts
         operator1 = AdminUser(
             username="operator1",
             password_hash=hash_password("op123"),
             centre_id=centres[2].id,  # Centre C (id 3)
-            role="CENTRE_OPERATOR"
+            role=RoleEnum.CENTRE_OPERATOR
         )
         admin_user = AdminUser(
-            username="admin_user",
+            username="admin",
             password_hash=hash_password("admin123"),
             centre_id=None,
-            role="ADMIN"
+            role=RoleEnum.ADMIN
         )
         super_admin = AdminUser(
             username="super",
             password_hash=hash_password("super123"),
             centre_id=None,
-            role="SUPER_ADMIN"
+            role=RoleEnum.SUPER_ADMIN
         )
         master = AdminUser(
             username="master",
             password_hash=hash_password("master123"),
             centre_id=None,
-            role="SUPER_ADMIN"
+            role=RoleEnum.SUPER_ADMIN
         )
-        db.add_all([operator, operator1, admin_user, super_admin, master])
+        db.add_all([operator1, admin_user, super_admin, master])
         db.flush()
-        print(f"   ✅ Operator: {operator.username} (Centre: {centres[0].name}, Password: admin123)")
         print(f"   ✅ Operator1: {operator1.username} (Centre: {centres[2].name}, Password: op123)")
         print(f"   ✅ Admin: {admin_user.username} (Password: admin123)")
         print(f"   ✅ Super Admin: {super_admin.username} (Password: super123)")
@@ -325,6 +344,78 @@ def _create_counters(db, centres):
 
     db.flush()
     print("   ✅ Counters: Created for all centres")
+
+
+def _ensure_centres(db):
+    """Ensure centres exist in database."""
+    centres = db.query(Centre).all()
+    if centres:
+        return centres
+
+    print("[INFO] No centres found. Seeding default centres...")
+    centres = [
+        Centre(
+            name="Centre A",
+            code="CTR-A",
+            address="APMC Market Yard, North Block, Main Road",
+            district="District 1",
+            state="State X",
+            latitude=11.0168,
+            longitude=76.9558,
+            total_counters=3,
+            active_counters=3,
+            is_active=True,
+            distance_km=4.0,
+            rating=4.2,
+        ),
+        Centre(
+            name="Centre B",
+            code="CTR-B",
+            address="Taluk Regulated Agricultural Market, Highway Junction",
+            district="District 2",
+            state="State X",
+            latitude=11.0245,
+            longitude=76.9612,
+            total_counters=2,
+            active_counters=2,
+            is_active=True,
+            distance_km=7.0,
+            rating=4.9,
+        ),
+        Centre(
+            name="Centre C",
+            code="CTR-C",
+            address="District Farmers Co-operative Hub, Sector 4",
+            district="District 3",
+            state="State Y",
+            latitude=11.0312,
+            longitude=76.9701,
+            total_counters=4,
+            active_counters=4,
+            is_active=True,
+            distance_km=10.0,
+            rating=4.5,
+        ),
+    ]
+    db.add_all(centres)
+    db.flush()
+
+    if not db.query(AdminUser).filter(AdminUser.username == "admin").first():
+        admin_user = AdminUser(username="admin", password_hash=hash_password("admin123"), centre_id=None, role=RoleEnum.ADMIN)
+        db.add(admin_user)
+    if not db.query(AdminUser).filter(AdminUser.username == "operator1").first():
+        op1 = AdminUser(username="operator1", password_hash=hash_password("op123"), centre_id=centres[2].id, role=RoleEnum.CENTRE_OPERATOR)
+        db.add(op1)
+    if not db.query(AdminUser).filter(AdminUser.username == "super").first():
+        sup = AdminUser(username="super", password_hash=hash_password("super123"), centre_id=None, role=RoleEnum.SUPER_ADMIN)
+        db.add(sup)
+    if not db.query(AdminUser).filter(AdminUser.username == "master").first():
+        mast = AdminUser(username="master", password_hash=hash_password("master123"), centre_id=None, role=RoleEnum.SUPER_ADMIN)
+        db.add(mast)
+
+    db.commit()
+    print(f"   ✅ Created {len(centres)} default centres")
+    return centres
 
 
 def _ensure_today_slots(db):

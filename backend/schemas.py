@@ -103,7 +103,10 @@ class CentreResponse(BaseModel):
 
 class CentreCreateRequest(BaseModel):
     name: str
+    # Master-assigned Centre ID. It is also the login username for the
+    # centre operator created with this centre.
     code: str
+    operator_password: str = Field(min_length=8, max_length=128)
     address: str
     district: str
     state: str
@@ -134,17 +137,41 @@ class CentreUpdateRequest(BaseModel):
     rating: Optional[float] = None
 
 # ──────────────────────────────────────────────
+# ──────────────────────────────────────────────
 # Slot Schemas
 # ──────────────────────────────────────────────
 
+class SlotCreateRequest(BaseModel):
+    centre_id: int
+    date: date
+    start_time: str
+    end_time: str
+    capacity: Optional[int] = 25
+    maximum_capacity: Optional[int] = None
+    is_active: Optional[bool] = True
+
+class SlotUpdateRequest(BaseModel):
+    capacity: Optional[int] = None
+    maximum_capacity: Optional[int] = None
+    is_active: Optional[bool] = None
+    status: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+
 class SlotResponse(BaseModel):
     id: int
+    centre_id: Optional[int] = None
+    date: Optional[date] = None
     start_time: str
     end_time: str
     capacity: int
+    maximum_capacity: Optional[int] = None
     booked_count: int
     available: int
+    status: Optional[str] = "AVAILABLE"
     is_active: bool
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -163,6 +190,7 @@ class BookingCreateRequest(BaseModel):
 class BookingResponse(BaseModel):
     booking_id: str
     token_number: int
+    token_display: str = ""
     status: str
     centre: str
     date: str
@@ -179,6 +207,7 @@ class BookingResponse(BaseModel):
 class BookingDetailResponse(BaseModel):
     booking_id: str
     token_number: int
+    token_display: str = ""
     centre: str
     centre_id: int
     date: str
@@ -197,12 +226,14 @@ class BookingDetailResponse(BaseModel):
 
 class QueueResponse(BaseModel):
     booking_id: str
+    token_number: str = ""  # Formatted token like "C3-006"
     token_display: str = ""
     queue_position: int
     farmers_ahead: int
     estimated_wait_minutes: int
-    active_counters: int
+    current_serving_token: Optional[str] = None
     status: str
+    active_counters: int
     assigned_counter: Optional[int] = None
     counter_name: Optional[str] = None
 
@@ -211,6 +242,10 @@ class QueueEntry(BaseModel):
     token_display: str = ""
     booking_id: str
     farmer_name: str
+    crop: Optional[str] = None
+    produce_type: Optional[str] = None
+    quantity: Optional[float] = None
+    booking_time: Optional[datetime] = None
     status: str
     arrival_time: Optional[datetime] = None
     queue_position: Optional[int] = None
@@ -308,4 +343,3 @@ class CounterUpdateRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     is_available: Optional[bool] = None
-

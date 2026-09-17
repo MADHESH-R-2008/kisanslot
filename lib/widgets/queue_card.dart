@@ -295,9 +295,18 @@ class QueueCard extends StatelessWidget {
             padding: const EdgeInsets.all(20),
             child: Column(
               children: [
-                // Metrics Row (Farmers Ahead, Wait Time, Counter)
+                // Metrics Grid (Current Token, Farmers Ahead, Wait Time, Counter)
                 Row(
                   children: [
+                    Expanded(
+                      child: _buildQueueStatBox(
+                        title: 'Current Token',
+                        value: booking.currentServingToken ?? 'None',
+                        icon: Icons.campaign_outlined,
+                        color: AppColors.secondaryDark,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildQueueStatBox(
                         title: 'Farmers Ahead',
@@ -306,19 +315,23 @@ class QueueCard extends StatelessWidget {
                         color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
                     Expanded(
                       child: _buildQueueStatBox(
                         title: 'Est. Wait',
-                        value: '${booking.waitTimeMinutes}m',
+                        value: '${booking.waitTimeMinutes} min',
                         icon: Icons.timelapse_outlined,
                         color: AppColors.secondary,
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: _buildQueueStatBox(
-                        title: 'Counters',
+                        title: 'Active Counters',
                         value: '${booking.counterNumber}',
                         icon: Icons.desktop_windows_outlined,
                         color: AppColors.info,

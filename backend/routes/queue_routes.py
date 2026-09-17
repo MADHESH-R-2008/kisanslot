@@ -1,3 +1,4 @@
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -109,6 +110,24 @@ def get_queue_position(
     active_counters = get_active_counter_count(db, booking.centre_id)
     queue_data = calculate_queue_position(db, booking, active_counters)
 
+    # Find current serving/called token
+    slot_date = booking.slot.date if booking.slot else date.today()
+    current_serving_b = (
+        db.query(Booking)
+        .join(Slot, Booking.slot_id == Slot.id)
+        .filter(
+            Booking.centre_id == booking.centre_id,
+            Slot.date == slot_date,
+            Booking.status.in_([BookingStatusEnum.CALLED, BookingStatusEnum.SERVING, BookingStatusEnum.PROCESSING]),
+        )
+        .order_by(Booking.token_number.asc())
+        .first()
+    )
+    current_serving_token = (
+        format_token_display(booking.centre_id, current_serving_b.token_number)
+        if current_serving_b else None
+    )
+
     # Get counter name if assigned
     counter_name = None
     if booking.assigned_counter:
@@ -118,12 +137,16 @@ def get_queue_position(
         ).first()
         counter_name = counter.name if counter else f"Counter {booking.assigned_counter}"
 
+    formatted_token = format_token_display(booking.centre_id, booking.token_number)
+
     return QueueResponse(
         booking_id=booking.booking_id,
-        token_display=format_token_display(booking.centre_id, booking.token_number),
+        token_number=formatted_token,
+        token_display=formatted_token,
         queue_position=queue_data["queue_position"],
         farmers_ahead=queue_data["farmers_ahead"],
         estimated_wait_minutes=queue_data["estimated_wait_minutes"],
+        current_serving_token=current_serving_token,
         active_counters=active_counters,
         status=queue_data["status"],
         assigned_counter=booking.assigned_counter,
@@ -187,7 +210,11 @@ def get_centre_queue_status(
                 token=b.token_number,
                 token_display=token_display,
                 booking_id=b.booking_id,
-                farmer_name=b.farmer.name,
+                farmer_name=b.farmer.name if b.farmer else "Farmer",
+                crop=b.crop,
+                produce_type=b.crop,
+                quantity=b.expected_quantity,
+                booking_time=b.created_at,
                 status=status_str,
                 arrival_time=b.arrival_time,
                 queue_position=pos,
@@ -202,7 +229,11 @@ def get_centre_queue_status(
                 token=b.token_number,
                 token_display=token_display,
                 booking_id=b.booking_id,
-                farmer_name=b.farmer.name,
+                farmer_name=b.farmer.name if b.farmer else "Farmer",
+                crop=b.crop,
+                produce_type=b.crop,
+                quantity=b.expected_quantity,
+                booking_time=b.created_at,
                 status=status_str,
                 arrival_time=b.arrival_time,
                 queue_position=None,
@@ -216,14 +247,18 @@ def get_centre_queue_status(
                 token=b.token_number,
                 token_display=token_display,
                 booking_id=b.booking_id,
-                farmer_name=b.farmer.name,
+                farmer_name=b.farmer.name if b.farmer else "Farmer",
+                crop=b.crop,
+                produce_type=b.crop,
+                quantity=b.expected_quantity,
+                booking_time=b.created_at,
                 status=status_str,
                 arrival_time=b.arrival_time,
                 queue_position=None,
                 assigned_counter=b.assigned_counter,
                 counter_name=counter_name,
-                estimated_wait_minutes=0,
             ))
+
 
     completed_count = (
         db.query(Booking)
@@ -410,38 +445,51 @@ async def resume_queue(admin: AdminUser = Depends(get_current_admin), db: Sessio
     return {"message": "Queue resumed"}
 
 
+@router.post("/centres/{centre_id}/next")
 @router.post("/admin/queue/next")
-async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+async def call_next_farmer(
+    centre_id: Optional[int] = None,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
     """
-    Phase 3.2: Call the next eligible farmer.
+    Call the next eligible farmer in queue.
     Assigns an available counter, updates status to CALLED.
-    Uses DB-level ordering to prevent race conditions.
+    Uses DB-level locking to prevent race conditions.
     """
-    centre_id = admin.centre_id
-    if not centre_id:
+    target_centre_id = centre_id or admin.centre_id
+    if not target_centre_id:
         raise HTTPException(status_code=400, detail="No centre assigned.")
+
+    if admin.role.value == "CENTRE_OPERATOR" and admin.centre_id != target_centre_id:
+        raise HTTPException(status_code=403, detail="You are not authorized for this centre.")
 
     # Find next waiting farmer (ordered by token number)
     today = date.today()
-    next_booking = (
+    query = (
         db.query(Booking)
         .join(Slot, Booking.slot_id == Slot.id)
         .filter(
-            Booking.centre_id == centre_id,
+            Booking.centre_id == target_centre_id,
             Slot.date == today,
             Booking.status.in_(WAITING_STATUSES),
         )
         .order_by(Booking.token_number.asc())
-        .with_for_update()  # Row-level lock
-        .first()
     )
+    try:
+        query = query.with_for_update()  # Row-level lock
+    except Exception:
+        pass
+
+    next_booking = query.first()
 
     if not next_booking:
         return {"message": "No farmers in queue", "booking": None}
 
     # Find available counter
-    counter = get_available_counter(db, centre_id)
+    counter = get_available_counter(db, target_centre_id)
     counter_name = None
+    counter_num = 1
 
     if counter:
         counter.status = CounterStatusEnum.BUSY
@@ -449,6 +497,7 @@ async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Se
         counter.is_available = False
         next_booking.assigned_counter = counter.id
         counter_name = counter.name
+        counter_num = counter.id
 
     next_booking.status = BookingStatusEnum.CALLED
     next_booking.call_time = datetime.utcnow()
@@ -456,49 +505,53 @@ async def call_next_farmer(admin: AdminUser = Depends(get_current_admin), db: Se
     db.commit()
     db.refresh(next_booking)
 
+    token_str = format_token_display(target_centre_id, next_booking.token_number)
+
     # Send notification to farmer
     try:
-        token_display = format_token_display(centre_id, next_booking.token_number)
         counter_info = f" at {counter_name}" if counter_name else ""
         send_notification(
             db,
             user_id=next_booking.farmer_id,
             title="🔔 Your Token Has Been Called!",
-            message=f"Token {token_display} has been called{counter_info}. Please proceed immediately.",
+            message=f"Token {token_str} has been called{counter_info}. Please proceed immediately.",
             type_str="QUEUE_CALL",
         )
     except Exception:
-        pass  # Don't fail the call action for notification errors
+        pass
 
-    await broadcast_queue_update(centre_id, db, event="FARMER_CALLED", extra={
+    await broadcast_queue_update(target_centre_id, db, event="FARMER_CALLED", extra={
         "token": next_booking.token_number,
-        "token_display": format_token_display(centre_id, next_booking.token_number),
+        "token_display": token_str,
         "booking_id": next_booking.booking_id,
         "status": "CALLED",
         "counter_name": counter_name,
+        "counter_number": counter_num,
     })
 
     return {
         "message": "Next farmer called",
         "booking_id": next_booking.booking_id,
-        "token_number": next_booking.token_number,
-        "token_display": format_token_display(centre_id, next_booking.token_number),
+        "token_number": token_str,
+        "token_display": token_str,
         "status": next_booking.status.value,
+        "counter_number": counter_num,
         "counter": counter_name,
     }
 
 
+@router.post("/{booking_id}/start")
 @router.post("/admin/booking/{booking_id}/start")
 async def start_serving(
     booking_id: str,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Phase 3.2: CALLED → SERVING. Sets serving_at timestamp."""
+    """CALLED → SERVING. Sets serving_at timestamp."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN":
+    if admin.role.value == "CENTRE_OPERATOR" and booking.centre_id != admin.centre_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if booking.status not in [BookingStatusEnum.CALLED]:
         raise HTTPException(
@@ -536,17 +589,18 @@ async def start_serving(
     return {"message": "Serving started", "status": booking.status.value}
 
 
+@router.post("/{booking_id}/complete")
 @router.post("/admin/booking/{booking_id}/complete")
 async def complete_processing(
     booking_id: str,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Phase 3.2: SERVING/PROCESSING → COMPLETED. Frees the counter."""
+    """SERVING/PROCESSING → COMPLETED. Frees the counter."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN":
+    if admin.role.value == "CENTRE_OPERATOR" and booking.centre_id != admin.centre_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if booking.status not in [BookingStatusEnum.SERVING, BookingStatusEnum.PROCESSING]:
         raise HTTPException(
@@ -589,17 +643,18 @@ async def complete_processing(
     return {"message": "Processing completed", "status": booking.status.value}
 
 
+@router.post("/{booking_id}/skip")
 @router.post("/admin/booking/{booking_id}/skip")
 async def skip_farmer(
     booking_id: str,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Phase 3.2: CALLED → SKIPPED. Frees the counter."""
+    """CALLED → SKIPPED. Frees the counter."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN":
+    if admin.role.value == "CENTRE_OPERATOR" and booking.centre_id != admin.centre_id:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if booking.status != BookingStatusEnum.CALLED:
         raise HTTPException(

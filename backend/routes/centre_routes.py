@@ -1,34 +1,35 @@
+from typing import List
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from typing import List
 
+from auth import hash_password
 from database import get_db
-from models import Centre, AdminUser, RoleEnum
-from schemas import CentreResponse, CentreCreateRequest, CentreUpdateRequest
-from dependencies import get_current_admin, require_admin_or_super, enforce_operator_centre
+from dependencies import enforce_operator_centre, get_current_admin, require_admin_or_super
+from models import AdminUser, Booking, Centre, Counter, Payment, Procurement, RoleEnum, Slot
+from schemas import CentreCreateRequest, CentreResponse, CentreUpdateRequest
 
 router = APIRouter(prefix="/api/centres", tags=["Centres"])
 
-# Public endpoint: list all centres (no auth required)
+
+@router.get("", response_model=List[CentreResponse])
 @router.get("/", response_model=List[CentreResponse])
 def list_centres(db: Session = Depends(get_db)):
-    centres = db.query(Centre).all()
-    return centres
+    """List active and inactive centres for the app and dashboard."""
+    return db.query(Centre).all()
 
-# Create centre – ADMIN or SUPER_ADMIN can create centres
-@router.post("/", response_model=CentreResponse)
+
+@router.post("/", response_model=CentreResponse, status_code=status.HTTP_201_CREATED)
 def create_centre(
     payload: CentreCreateRequest,
-    admin: dict = Depends(require_admin_or_super()),
+    admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    # Ensure the caller has sufficient role
-    if admin.get("role") not in [RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Admin or Super Admin accounts can create centres",
-        )
+    """Master-only: create a centre and its Centre ID/password operator login."""
+    if admin.role != RoleEnum.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the Master can create centres")
+
     centre = Centre(
         name=payload.name,
         code=payload.code,
@@ -47,54 +48,102 @@ def create_centre(
     )
     db.add(centre)
     try:
+        db.flush()
+        db.add(AdminUser(
+            username=payload.code,
+            password_hash=hash_password(payload.operator_password),
+            role=RoleEnum.CENTRE_OPERATOR,
+            centre_id=centre.id,
+        ))
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A centre with this code already exists",
-        )
+        raise HTTPException(status_code=409, detail="That Centre ID is already in use")
+
     db.refresh(centre)
     return centre
 
-# Update centre – ADMIN/SUPER_ADMIN can update any centre; CENTRE_OPERATOR can update only its own centre
+
 @router.put("/{centre_id}", response_model=CentreResponse)
 def update_centre(
     centre_id: int,
     payload: CentreUpdateRequest,
     admin: dict = Depends(require_admin_or_super()),
     db: Session = Depends(get_db),
-    allowed: bool = Depends(enforce_operator_centre),
+    _: bool = Depends(enforce_operator_centre),
 ):
+    """Masters/Admins can update all centres; operators can update their own."""
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
     if not centre:
         raise HTTPException(status_code=404, detail="Centre not found")
-    # Apply only the fields supplied by the client
+
     for attr, value in payload.dict(exclude_unset=True).items():
         setattr(centre, attr, value)
     try:
         db.commit()
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A centre with this code already exists",
-        )
+        raise HTTPException(status_code=409, detail="That Centre ID is already in use")
     db.refresh(centre)
     return centre
 
-# Delete centre – only SUPER_ADMIN can delete centres
+
+@router.delete("/", status_code=status.HTTP_200_OK)
+def delete_all_centres(
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    """Master-only destructive reset of all centres and their centre-owned data."""
+    if admin.role != RoleEnum.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the Master can delete all centres")
+
+    centre_ids = [centre_id for (centre_id,) in db.query(Centre.id).all()]
+    if not centre_ids:
+        return {"message": "No centres to delete", "deleted_centres": 0}
+
+    booking_ids = [booking_id for (booking_id,) in db.query(Booking.id).filter(Booking.centre_id.in_(centre_ids)).all()]
+    try:
+        # Remove dependants in foreign-key-safe order.
+        db.query(Counter).filter(Counter.centre_id.in_(centre_ids)).delete(synchronize_session=False)
+        if booking_ids:
+            db.query(Payment).filter(Payment.booking_id.in_(booking_ids)).delete(synchronize_session=False)
+            db.query(Procurement).filter(Procurement.booking_id.in_(booking_ids)).delete(synchronize_session=False)
+            db.query(Booking).filter(Booking.id.in_(booking_ids)).delete(synchronize_session=False)
+        db.query(Slot).filter(Slot.centre_id.in_(centre_ids)).delete(synchronize_session=False)
+        db.query(AdminUser).filter(
+            AdminUser.centre_id.in_(centre_ids),
+            AdminUser.role == RoleEnum.CENTRE_OPERATOR,
+        ).delete(synchronize_session=False)
+        db.query(AdminUser).filter(AdminUser.centre_id.in_(centre_ids)).update(
+            {AdminUser.centre_id: None}, synchronize_session=False,
+        )
+        deleted_centres = db.query(Centre).filter(Centre.id.in_(centre_ids)).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Could not delete all centres")
+
+    return {"message": "All centres and their operator accounts were deleted", "deleted_centres": deleted_centres}
+
+
 @router.delete("/{centre_id}")
 def delete_centre(
     centre_id: int,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    if admin.role.value != RoleEnum.SUPER_ADMIN.value:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only Super Admin can delete centres")
+    """Master-only deletion for centres that do not have booking history."""
+    if admin.role != RoleEnum.SUPER_ADMIN:
+        raise HTTPException(status_code=403, detail="Only the Master can delete centres")
+
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
     if not centre:
         raise HTTPException(status_code=404, detail="Centre not found")
+    if centre.bookings:
+        raise HTTPException(
+            status_code=409,
+            detail="This centre has booking history. Use Delete all centres to reset centre data.",
+        )
     db.delete(centre)
     db.commit()
     return {"message": "Centre deleted"}

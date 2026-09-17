@@ -22,6 +22,7 @@ class BookingModel {
   final String bookingId;
   final int tokenNumber;
   final String tokenDisplay; // Phase 3.2
+  final String? currentServingToken;
   final int centreId;
   final String centreName;
   final String date;
@@ -46,6 +47,7 @@ class BookingModel {
     required this.bookingId,
     required this.tokenNumber,
     this.tokenDisplay = '',
+    this.currentServingToken,
     required this.centreId,
     required this.centreName,
     required this.date,
@@ -105,10 +107,15 @@ class BookingModel {
         bookingStatus = BookingStatus.confirmed;
     }
 
+    final int tokNum = (json['token_number'] is int)
+        ? json['token_number']
+        : int.tryParse((json['token_number'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
     return BookingModel(
       bookingId: json['booking_id'] ?? '',
-      tokenNumber: json['token_number'] ?? 0,
-      tokenDisplay: json['token_display'] ?? '',
+      tokenNumber: tokNum,
+      tokenDisplay: json['token_display'] ?? (json['token_number'] is String ? json['token_number'] : ''),
+      currentServingToken: json['current_serving_token'],
       centreId: json['centre_id'] ?? 0,
       centreName: json['centre'] ?? '',
       date: json['date'] ?? '',
@@ -127,30 +134,35 @@ class BookingModel {
 
   /// Create from booking creation API response
   factory BookingModel.fromCreateResponse(Map<String, dynamic> json) {
+    final int tokNum = (json['token_number'] is int)
+        ? json['token_number']
+        : int.tryParse((json['token_number'] ?? '0').toString().replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+
     return BookingModel(
       bookingId: json['booking_id'] ?? '',
-      tokenNumber: json['token_number'] ?? 0,
-      tokenDisplay: json['token_display'] ?? '',
-      centreId: 0,
+      tokenNumber: tokNum,
+      tokenDisplay: json['token_display'] ?? (json['token_number'] is String ? json['token_number'] : ''),
+      currentServingToken: null,
+      centreId: json['centre_id'] ?? 0,
       centreName: json['centre'] ?? '',
       date: json['date'] ?? '',
       timeRange: '${json['start_time'] ?? ''} - ${json['end_time'] ?? ''}',
-      crop: json['crop'] ?? '',
-      quantityKg: (json['expected_quantity'] ?? 0).toDouble(),
+      crop: json['crop'] ?? json['produce_type'] ?? '',
+      quantityKg: (json['quantity'] ?? json['expected_quantity'] ?? 0).toDouble(),
       vehicleNumber: json['vehicle_number'] ?? '',
-      queuePosition: json['token_number'] ?? 0,
-      farmersAhead: (json['token_number'] ?? 1) - 1,
+      queuePosition: tokNum,
+      farmersAhead: tokNum > 0 ? tokNum - 1 : 0,
       counterNumber: 3,
       assignedCounterName: null,
       waitTimeMinutes: 0,
       status: BookingStatus.confirmed,
     );
   }
-
   BookingModel copyWith({
     String? bookingId,
     int? tokenNumber,
     String? tokenDisplay,
+    String? currentServingToken,
     int? centreId,
     String? centreName,
     String? date,
@@ -175,6 +187,7 @@ class BookingModel {
       bookingId: bookingId ?? this.bookingId,
       tokenNumber: tokenNumber ?? this.tokenNumber,
       tokenDisplay: tokenDisplay ?? this.tokenDisplay,
+      currentServingToken: currentServingToken ?? this.currentServingToken,
       centreId: centreId ?? this.centreId,
       centreName: centreName ?? this.centreName,
       date: date ?? this.date,

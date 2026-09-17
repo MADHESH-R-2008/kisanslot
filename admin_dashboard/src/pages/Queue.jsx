@@ -118,7 +118,7 @@ const Queue = () => {
     setActionLoading(key);
     try {
       switch (action) {
-        case 'callNext': await queueAPI.callNext(); break;
+        case 'callNext': await queueAPI.callNext(centreId); break;
         case 'pause': await queueAPI.pauseQueue(); break;
         case 'resume': await queueAPI.resumeQueue(); break;
         case 'start': await queueAPI.startProcessing(bookingId); break;
@@ -333,7 +333,7 @@ const Queue = () => {
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ backgroundColor: 'var(--bg-color)' }}>
-                  {['Token', 'Farmer', 'Status', 'Position', 'Counter', 'Est. Wait', 'Actions'].map((h) => (
+                  {['Token', 'Farmer', 'Produce', 'Quantity', 'Booking Time', 'Status', 'Counter', 'Action'].map((h) => (
                     <th key={h} style={{ padding: '0.75rem 1rem', textAlign: 'left', fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)', fontWeight: 600, borderBottom: '1px solid var(--border-color)' }}>
                       {h}
                     </th>
@@ -348,28 +348,22 @@ const Queue = () => {
                   >
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <div>
-                        <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary-color)' }}>#{entry.token}</span>
-                        {entry.token_display && (
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>{entry.token_display}</div>
-                        )}
+                        <span style={{ fontWeight: 700, fontSize: '1.05rem', color: 'var(--primary-color)' }}>
+                          {entry.token_display || `#${entry.token}`}
+                        </span>
                       </div>
                     </td>
                     <td style={{ padding: '0.85rem 1rem', fontWeight: 500 }}>{entry.farmer_name}</td>
-                    <td style={{ padding: '0.85rem 1rem' }}><StatusBadge status={entry.status} /></td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)' }}>
-                      {entry.queue_position ? `#${entry.queue_position}` : '—'}
+                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem' }}>{entry.produce_type || entry.crop || 'Paddy'}</td>
+                    <td style={{ padding: '0.85rem 1rem', fontSize: '0.875rem', fontWeight: 600 }}>{entry.quantity ? `${entry.quantity} kg` : '—'}</td>
+                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                      {entry.booking_time ? new Date(entry.booking_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
                     </td>
+                    <td style={{ padding: '0.85rem 1rem' }}><StatusBadge status={entry.status} /></td>
                     <td style={{ padding: '0.85rem 1rem' }}>
                       {entry.counter_name ? (
                         <span style={{ fontSize: '0.8rem', fontWeight: 500, color: '#5b21b6' }}>{entry.counter_name}</span>
                       ) : <span style={{ color: 'var(--text-secondary)' }}>—</span>}
-                    </td>
-                    <td style={{ padding: '0.85rem 1rem', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-                      {entry.estimated_wait_minutes != null && entry.estimated_wait_minutes > 0 ? (
-                        <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                          <Clock size={12} /> {entry.estimated_wait_minutes} min
-                        </span>
-                      ) : '—'}
                     </td>
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
@@ -381,7 +375,7 @@ const Queue = () => {
                               disabled={!!actionLoading}
                               style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
                             >
-                              <Play size={12} /> Start
+                              <Play size={12} /> Start Serving
                             </button>
                             <button
                               onClick={() => setSkipConfirm(entry)}
@@ -389,14 +383,6 @@ const Queue = () => {
                               style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', backgroundColor: '#f97316', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.25rem', fontWeight: 500 }}
                             >
                               <SkipForward size={12} /> Skip
-                            </button>
-                            <button
-                              className="btn btn-danger"
-                              onClick={() => handleAction('noShow', entry.booking_id)}
-                              disabled={!!actionLoading}
-                              style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
-                            >
-                              <XCircle size={12} /> No Show
                             </button>
                           </>
                         )}

@@ -106,9 +106,11 @@ class BookingConfirmationScreen extends StatelessWidget {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                '#${activeBooking.tokenNumber}',
+                                activeBooking.tokenDisplay.isNotEmpty
+                                    ? activeBooking.tokenDisplay
+                                    : '#${activeBooking.tokenNumber}',
                                 style: const TextStyle(
-                                  fontSize: 32,
+                                  fontSize: 28,
                                   fontWeight: FontWeight.w900,
                                   color: Colors.white,
                                 ),
@@ -154,17 +156,17 @@ class BookingConfirmationScreen extends StatelessWidget {
                       padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
-                          _buildDetailRow('Procurement Centre', activeBooking.centreName, Icons.storefront_rounded),
+                          _buildDetailRow('Centre', activeBooking.centreName, Icons.storefront_rounded),
                           const Divider(height: 20, color: AppColors.cardBorder),
                           _buildDetailRow('Date', activeBooking.date, Icons.calendar_month_rounded),
                           const Divider(height: 20, color: AppColors.cardBorder),
-                          _buildDetailRow('Time Window', activeBooking.timeRange, Icons.access_time_rounded),
+                          _buildDetailRow('Time', activeBooking.timeRange, Icons.access_time_rounded),
                           const Divider(height: 20, color: AppColors.cardBorder),
-                          _buildDetailRow('Crop', activeBooking.crop, Icons.grass_rounded),
+                          _buildDetailRow('Produce', activeBooking.crop, Icons.grass_rounded),
                           const Divider(height: 20, color: AppColors.cardBorder),
                           _buildDetailRow('Quantity', '${activeBooking.quantityKg.toStringAsFixed(0)} kg', Icons.scale_rounded),
                           const Divider(height: 20, color: AppColors.cardBorder),
-                          _buildDetailRow('Vehicle Number', activeBooking.vehicleNumber, Icons.local_shipping_outlined),
+                          _buildDetailRow('Estimated Wait', '${activeBooking.waitTimeMinutes > 0 ? activeBooking.waitTimeMinutes : 12} minutes', Icons.timelapse_rounded),
                         ],
                       ),
                     ),

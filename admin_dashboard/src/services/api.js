@@ -35,19 +35,27 @@ export const queueAPI = {
   getCentreStatus: (centreId) => api.get(`/queue/centre/${centreId}/status`),
   getQueueStats: (centreId) => api.get(`/queue/centre/${centreId}/stats`),
   getAdminList: () => api.get('/queue/admin/list'),
-  callNext: () => api.post('/queue/admin/queue/next'),
+  callNext: (centreId) => api.post(`/queue/centres/${centreId}/next`),
   pauseQueue: () => api.post('/queue/admin/queue/pause'),
   resumeQueue: () => api.post('/queue/admin/queue/resume'),
   startProcessing: (bookingId) =>
-    api.post(`/queue/admin/booking/${bookingId}/start`),
+    api.post(`/queue/${bookingId}/start`),
   completeProcessing: (bookingId) =>
-    api.post(`/queue/admin/booking/${bookingId}/complete`),
+    api.post(`/queue/${bookingId}/complete`),
   markNoShow: (bookingId) =>
     api.post(`/queue/admin/booking/${bookingId}/no_show`),
   skipFarmer: (bookingId) =>
-    api.post(`/queue/admin/booking/${bookingId}/skip`),
+    api.post(`/queue/${bookingId}/skip`),
   updateStatus: (bookingId, status) =>
     api.put(`/queue/admin/booking/${bookingId}/status`, { status }),
+};
+
+// ── Slots ─────────────────────────────────────────────────────────────────────
+export const slotAPI = {
+  list: (centreId, date) => api.get(`/centres/${centreId}/slots?date=${date}`),
+  create: (data) => api.post('/slots', data),
+  update: (id, data) => api.put(`/slots/${id}`, data),
+  remove: (id) => api.delete(`/slots/${id}`),
 };
 
 // ── Centres ───────────────────────────────────────────────────────────────────
@@ -56,6 +64,7 @@ export const centreAPI = {
   create: (data) => api.post('/centres/', data),
   update: (id, data) => api.put(`/centres/${id}`, data),
   remove: (id) => api.delete(`/centres/${id}`),
+  removeAll: () => api.delete('/centres/'),
 };
 
 // ── Counters ──────────────────────────────────────────────────────────────────

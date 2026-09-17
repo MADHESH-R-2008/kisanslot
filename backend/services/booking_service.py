@@ -1,5 +1,6 @@
 from datetime import date as date_type
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from models import Booking, Slot
 
 
@@ -25,38 +26,38 @@ def generate_booking_id(db: Session) -> str:
 
 def generate_token_number(db: Session, slot_id: int, centre_id: int = None) -> int:
     """
-    Generate a sequential token number for a given centre and date.
-    Phase 3.2: Tokens are now per-centre-per-date (not per-slot).
-    Falls back to per-slot if centre_id not provided (backward compat).
+    Generate a sequential, concurrency-safe token number for a given centre and date.
+    Uses row/table locking semantics where supported to prevent duplicate tokens.
     """
-    if centre_id is not None:
-        # Get the slot date
-        slot = db.query(Slot).filter(Slot.id == slot_id).first()
-        if slot:
-            # Count all bookings for this centre on the same date
-            count = (
-                db.query(Booking)
-                .join(Slot, Booking.slot_id == Slot.id)
-                .filter(
-                    Booking.centre_id == centre_id,
-                    Slot.date == slot.date,
-                )
-                .count()
-            )
-            return count + 1
+    slot = db.query(Slot).filter(Slot.id == slot_id).first()
+    if not slot:
+        return 1
 
-    # Fallback: per-slot token (backward compat)
-    count = (
-        db.query(Booking)
-        .filter(Booking.slot_id == slot_id)
-        .count()
+    target_centre_id = centre_id or slot.centre_id
+
+    # Query highest token_number for this centre on this date with row lock if possible
+    query = (
+        db.query(func.max(Booking.token_number))
+        .join(Slot, Booking.slot_id == Slot.id)
+        .filter(
+            Booking.centre_id == target_centre_id,
+            Slot.date == slot.date,
+        )
     )
-    return count + 1
+
+    try:
+        query = query.with_for_update()
+    except Exception:
+        pass  # Dialects like SQLite don't support with_for_update
+
+    max_token = query.scalar() or 0
+    return max_token + 1
 
 
 def format_token_display(centre_id: int, token_number: int) -> str:
     """
     Format a token for display.
-    Example: centre_id=3, token_number=15 → 'C003-015'
+    Example: centre_id=3, token_number=6 → 'C3-006'
     """
-    return f"C{centre_id:03d}-{token_number:03d}"
+    return f"C{centre_id}-{token_number:03d}"
+

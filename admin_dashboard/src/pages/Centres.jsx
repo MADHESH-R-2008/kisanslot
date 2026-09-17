@@ -47,7 +47,8 @@ const CentreModal = ({ centre, onClose, onSave }) => {
         <h3 style={{ marginTop: 0 }}>{centre ? 'Edit Centre' : 'Create New Centre'}</h3>
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div style={{ gridColumn: '1 / -1' }}>{field('Centre Name *', 'name', 'text', { required: true })}</div>
-          {field('Centre Code *', 'code', 'text', { required: true })}
+          {field('Centre ID *', 'code', 'text', { required: true })}
+          {!centre && field('Centre Operator Password *', 'operator_password', 'password', { required: true })}
           {field('Contact Number', 'contact_number')}
           <div style={{ gridColumn: '1 / -1' }}>{field('Address *', 'address', 'text', { required: true })}</div>
           {field('District *', 'district', 'text', { required: true })}
@@ -119,6 +120,18 @@ const Centres = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    const confirmation = window.prompt('This permanently deletes every centre, its bookings, slots, counters, and centre operator accounts. Type DELETE ALL to continue.');
+    if (confirmation !== 'DELETE ALL') return;
+    try {
+      const response = await centreAPI.removeAll();
+      alert(response.data.message);
+      fetchCentres();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Could not delete all centres.');
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -138,6 +151,11 @@ const Centres = () => {
           {canCreateCentres && (
             <button className="btn btn-primary" onClick={() => setModal('create')} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <Plus size={16} /> Add Centre
+            </button>
+          )}
+          {isSuperAdmin && centres.length > 0 && (
+            <button className="btn btn-secondary" onClick={handleDeleteAll} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--danger-color)' }}>
+              <Trash2 size={16} /> Delete All
             </button>
           )}
         </div>

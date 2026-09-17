@@ -140,6 +140,7 @@ async def create_booking(
     return BookingResponse(
         booking_id=booking.booking_id,
         token_number=booking.token_number,
+        token_display=format_token_display(booking.centre_id, booking.token_number),
         status=booking.status.value,
         centre=centre.name,
         date=slot.date.strftime("%Y-%m-%d"),
@@ -150,6 +151,43 @@ async def create_booking(
         vehicle_number=booking.vehicle_number,
         created_at=booking.created_at,
     )
+
+
+@router.get("/my", response_model=list[BookingDetailResponse])
+@router.get("", response_model=list[BookingDetailResponse])
+def list_my_bookings(
+    farmer: Farmer = Depends(get_current_farmer),
+    db: Session = Depends(get_db),
+):
+    """Return all bookings for the logged-in farmer."""
+    bookings = (
+        db.query(Booking)
+        .filter(Booking.farmer_id == farmer.id)
+        .order_by(Booking.created_at.desc())
+        .all()
+    )
+
+    result = []
+    for booking in bookings:
+        slot = db.query(Slot).filter(Slot.id == booking.slot_id).first()
+        centre = db.query(Centre).filter(Centre.id == booking.centre_id).first()
+        result.append(
+            BookingDetailResponse(
+                booking_id=booking.booking_id,
+                token_number=booking.token_number,
+                token_display=format_token_display(booking.centre_id, booking.token_number),
+                centre=centre.name if centre else "Unknown",
+                centre_id=booking.centre_id,
+                date=slot.date.strftime("%Y-%m-%d") if slot else "",
+                time=f"{slot.start_time.strftime('%H:%M')} - {slot.end_time.strftime('%H:%M')}" if slot else "",
+                crop=booking.crop,
+                quantity=booking.expected_quantity,
+                vehicle_number=booking.vehicle_number,
+                status=booking.status.value,
+            )
+        )
+
+    return result
 
 
 @router.get("/{booking_id}", response_model=BookingDetailResponse)
@@ -179,6 +217,7 @@ def get_booking(
     return BookingDetailResponse(
         booking_id=booking.booking_id,
         token_number=booking.token_number,
+        token_display=format_token_display(booking.centre_id, booking.token_number),
         centre=centre.name if centre else "Unknown",
         centre_id=booking.centre_id,
         date=slot.date.strftime("%Y-%m-%d") if slot else "",
@@ -190,36 +229,51 @@ def get_booking(
     )
 
 
-@router.get("", response_model=list[BookingDetailResponse])
-def list_my_bookings(
+@router.put("/{booking_id}/cancel")
+async def cancel_booking(
+    booking_id: str,
     farmer: Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
 ):
-    """Return all bookings for the logged-in farmer."""
-    bookings = (
-        db.query(Booking)
-        .filter(Booking.farmer_id == farmer.id)
-        .order_by(Booking.created_at.desc())
-        .all()
-    )
+    """Cancel a booking by booking_id."""
+    booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
 
-    result = []
-    for booking in bookings:
-        slot = db.query(Slot).filter(Slot.id == booking.slot_id).first()
-        centre = db.query(Centre).filter(Centre.id == booking.centre_id).first()
-        result.append(
-            BookingDetailResponse(
-                booking_id=booking.booking_id,
-                token_number=booking.token_number,
-                centre=centre.name if centre else "Unknown",
-                centre_id=booking.centre_id,
-                date=slot.date.strftime("%Y-%m-%d") if slot else "",
-                time=f"{slot.start_time.strftime('%H:%M')} - {slot.end_time.strftime('%H:%M')}" if slot else "",
-                crop=booking.crop,
-                quantity=booking.expected_quantity,
-                vehicle_number=booking.vehicle_number,
-                status=booking.status.value,
-            )
+    if booking.farmer_id != farmer.id:
+        raise HTTPException(status_code=403, detail="You are not authorized to cancel this booking.")
+
+    terminal_statuses = [
+        BookingStatusEnum.COMPLETED,
+        BookingStatusEnum.CANCELLED,
+        BookingStatusEnum.SERVING,
+        BookingStatusEnum.PROCESSING,
+        BookingStatusEnum.NO_SHOW,
+    ]
+    if booking.status in terminal_statuses:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot cancel booking with current status '{booking.status.value}'.",
         )
 
-    return result
+    booking.status = BookingStatusEnum.CANCELLED
+
+    if booking.slot:
+        booking.slot.booked_count = max(0, booking.slot.booked_count - 1)
+
+    db.commit()
+
+    try:
+        from routes.queue_routes import broadcast_queue_update
+        await broadcast_queue_update(booking.centre_id, db, event="BOOKING_CANCELLED", extra={
+            "booking_id": booking.booking_id,
+            "status": "CANCELLED",
+        })
+    except Exception:
+        pass
+
+    return {
+        "message": "Booking cancelled successfully",
+        "booking_id": booking_id,
+        "status": booking.status.value,
+    }
