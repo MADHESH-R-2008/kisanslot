@@ -20,15 +20,16 @@ def list_centres(db: Session = Depends(get_db)):
     return db.query(Centre).all()
 
 
+@router.post("", response_model=CentreResponse, status_code=status.HTTP_201_CREATED)
 @router.post("/", response_model=CentreResponse, status_code=status.HTTP_201_CREATED)
 def create_centre(
     payload: CentreCreateRequest,
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Master-only: create a centre and its Centre ID/password operator login."""
-    if admin.role != RoleEnum.SUPER_ADMIN:
-        raise HTTPException(status_code=403, detail="Only the Master can create centres")
+    """Admin or Master: create a centre and its Centre ID/password operator login."""
+    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Admin or Master account required to create centres")
 
     centre = Centre(
         name=payload.name,
@@ -88,14 +89,15 @@ def update_centre(
     return centre
 
 
+@router.delete("", status_code=status.HTTP_200_OK)
 @router.delete("/", status_code=status.HTTP_200_OK)
 def delete_all_centres(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
     """Master-only destructive reset of all centres and their centre-owned data."""
-    if admin.role != RoleEnum.SUPER_ADMIN:
-        raise HTTPException(status_code=403, detail="Only the Master can delete all centres")
+    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
     centre_ids = [centre_id for (centre_id,) in db.query(Centre.id).all()]
     if not centre_ids:
@@ -132,9 +134,9 @@ def delete_centre(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Master-only deletion for centres that do not have booking history."""
-    if admin.role != RoleEnum.SUPER_ADMIN:
-        raise HTTPException(status_code=403, detail="Only the Master can delete centres")
+    """Admin or Master deletion for centres."""
+    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
     if not centre:
@@ -144,6 +146,12 @@ def delete_centre(
             status_code=409,
             detail="This centre has booking history. Use Delete all centres to reset centre data.",
         )
+    
+    # Clean up counters & slots before deleting centre
+    db.query(Counter).filter(Counter.centre_id == centre_id).delete(synchronize_session=False)
+    db.query(Slot).filter(Slot.centre_id == centre_id).delete(synchronize_session=False)
+    db.query(AdminUser).filter(AdminUser.centre_id == centre_id, AdminUser.role == RoleEnum.CENTRE_OPERATOR).delete(synchronize_session=False)
+
     db.delete(centre)
     db.commit()
     return {"message": "Centre deleted"}
