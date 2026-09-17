@@ -148,3 +148,58 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
         return AdminTokenResponse(access_token=token, centre_id=admin.centre_id, role=role_str)
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide either mobile (farmer) or username (admin) for login.")
+
+
+@router.post("/reset-admin", tags=["System"])
+@router.get("/reset-admin", tags=["System"])
+def reset_admin_credentials(db: Session = Depends(get_db)):
+    """Reset admin and centre operator credentials & assigned centre IDs."""
+    from models import Centre, RoleEnum
+    centres = db.query(Centre).all()
+    if not centres:
+        from seed import seed
+        seed()
+        centres = db.query(Centre).all()
+
+    centre_c = db.query(Centre).filter(Centre.code == "CTR-C").first() or (centres[2] if len(centres) > 2 else centres[0])
+    centre_a = db.query(Centre).filter(Centre.code == "CTR-A").first() or centres[0]
+    centre_b = db.query(Centre).filter(Centre.code == "CTR-B").first() or (centres[1] if len(centres) > 1 else centres[0])
+
+    users_to_reset = [
+        {"username": "operator1", "password": "op123", "role": RoleEnum.CENTRE_OPERATOR, "centre_id": centre_c.id},
+        {"username": "operator_a", "password": "op123", "role": RoleEnum.CENTRE_OPERATOR, "centre_id": centre_a.id},
+        {"username": "operator_b", "password": "op123", "role": RoleEnum.CENTRE_OPERATOR, "centre_id": centre_b.id},
+        {"username": "admin", "password": "admin123", "role": RoleEnum.ADMIN, "centre_id": centre_c.id},
+        {"username": "super", "password": "super123", "role": RoleEnum.SUPER_ADMIN, "centre_id": None},
+        {"username": "master", "password": "master123", "role": RoleEnum.SUPER_ADMIN, "centre_id": None},
+    ]
+
+    reset_summary = []
+    for u in users_to_reset:
+        user = db.query(AdminUser).filter(AdminUser.username == u["username"]).first()
+        if not user:
+            user = AdminUser(
+                username=u["username"],
+                password_hash=hash_password(u["password"]),
+                role=u["role"],
+                centre_id=u["centre_id"],
+            )
+            db.add(user)
+        else:
+            user.password_hash = hash_password(u["password"])
+            user.role = u["role"]
+            user.centre_id = u["centre_id"]
+            user.is_active = True
+        reset_summary.append({
+            "username": u["username"],
+            "password": u["password"],
+            "role": u["role"].value if hasattr(u["role"], 'value') else u["role"],
+            "centre_id": u["centre_id"],
+        })
+
+    db.commit()
+    return {
+        "status": "Admin and Centre Operator credentials reset successfully",
+        "accounts": reset_summary,
+    }
+
