@@ -129,6 +129,7 @@ class CentreCreateRequest(BaseModel):
 class CentreUpdateRequest(BaseModel):
     name: Optional[str] = None
     code: Optional[str] = None
+    operator_password: Optional[str] = None
     address: Optional[str] = None
     district: Optional[str] = None
     state: Optional[str] = None

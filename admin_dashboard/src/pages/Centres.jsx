@@ -17,7 +17,11 @@ const CentreModal = ({ centre, onClose, onSave }) => {
       window.alert('Active counters cannot be greater than total counters.');
       return;
     }
-    onSave(form);
+    const payload = { ...form };
+    if (centre && (!payload.operator_password || !payload.operator_password.trim())) {
+      delete payload.operator_password;
+    }
+    onSave(payload);
   };
 
   const field = (label, key, type = 'text', opts = {}) => (
@@ -49,7 +53,9 @@ const CentreModal = ({ centre, onClose, onSave }) => {
         <form onSubmit={handleSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
           <div style={{ gridColumn: '1 / -1' }}>{field('Centre Name *', 'name', 'text', { required: true })}</div>
           {field('Centre ID *', 'code', 'text', { required: true })}
-          {!centre && field('Centre Operator Password *', 'operator_password', 'password', { required: true })}
+          {!centre
+            ? field('Centre Operator Password *', 'operator_password', 'password', { required: true, placeholder: 'Min 8 characters' })
+            : field('Reset Operator Password (Optional)', 'operator_password', 'password', { placeholder: 'Leave blank to keep current' })}
           {field('Contact Number', 'contact_number')}
           <div style={{ gridColumn: '1 / -1' }}>{field('Address *', 'address', 'text', { required: true })}</div>
           <div style={{ gridColumn: '1 / -1' }}>{field('Google Map URL / Link (Optional)', 'google_map_url', 'text', { placeholder: 'https://maps.google.com/?q=...' })}</div>

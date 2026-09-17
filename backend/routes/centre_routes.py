@@ -76,12 +76,13 @@ def create_centre(
     if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to create centres")
 
+    clean_code = payload.code.strip()
     centre = Centre(
-        name=payload.name,
-        code=payload.code,
-        address=payload.address,
-        district=payload.district,
-        state=payload.state,
+        name=payload.name.strip(),
+        code=clean_code,
+        address=payload.address.strip() if payload.address else "",
+        district=payload.district.strip() if payload.district else "",
+        state=payload.state.strip() if payload.state else "",
         latitude=payload.latitude,
         longitude=payload.longitude,
         contact_number=payload.contact_number,
@@ -97,7 +98,7 @@ def create_centre(
     try:
         db.flush()
         db.add(AdminUser(
-            username=payload.code,
+            username=clean_code,
             password_hash=hash_password(payload.operator_password),
             role=RoleEnum.CENTRE_OPERATOR,
             centre_id=centre.id,
@@ -124,8 +125,44 @@ def update_centre(
     if not centre:
         raise HTTPException(status_code=404, detail="Centre not found")
 
-    for attr, value in payload.dict(exclude_unset=True).items():
+    update_data = payload.dict(exclude_unset=True)
+    operator_password = update_data.pop("operator_password", None)
+
+    if "code" in update_data and update_data["code"]:
+        update_data["code"] = update_data["code"].strip()
+
+    for attr, value in update_data.items():
         setattr(centre, attr, value)
+
+    # Sync associated AdminUser operator credentials
+    admin_user = db.query(AdminUser).filter(AdminUser.centre_id == centre.id, AdminUser.role == RoleEnum.CENTRE_OPERATOR).first()
+    if not admin_user:
+        admin_user = db.query(AdminUser).filter(AdminUser.username == centre.code).first()
+
+    if "code" in update_data and update_data["code"]:
+        if admin_user:
+            admin_user.username = update_data["code"]
+        else:
+            admin_user = AdminUser(
+                username=update_data["code"],
+                password_hash=hash_password(operator_password or "op123456"),
+                role=RoleEnum.CENTRE_OPERATOR,
+                centre_id=centre.id,
+            )
+            db.add(admin_user)
+
+    if operator_password and operator_password.strip():
+        if admin_user:
+            admin_user.password_hash = hash_password(operator_password.strip())
+        else:
+            admin_user = AdminUser(
+                username=centre.code,
+                password_hash=hash_password(operator_password.strip()),
+                role=RoleEnum.CENTRE_OPERATOR,
+                centre_id=centre.id,
+            )
+            db.add(admin_user)
+
     try:
         db.commit()
     except IntegrityError:

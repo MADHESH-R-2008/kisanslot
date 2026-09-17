@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -87,8 +88,8 @@ def login(req: FarmerLoginRequest, db: Session = Depends(get_db)):
 @router.post("/admin/login", response_model=AdminTokenResponse)
 def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
     """Authenticate an AdminUser and return a JWT token."""
-    
-    admin = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+    clean_username = req.username.strip()
+    admin = db.query(AdminUser).filter(func.lower(AdminUser.username) == func.lower(clean_username)).first()
     if not admin:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -126,7 +127,7 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
     Returns appropriate token response based on credentials.
     """
     if req.mobile:
-        farmer = db.query(Farmer).filter(Farmer.mobile == req.mobile).first()
+        farmer = db.query(Farmer).filter(Farmer.mobile == req.mobile.strip()).first()
         if not farmer:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No farmer account found with this mobile number.")
         if not verify_password(req.password, farmer.password_hash):
@@ -134,7 +135,8 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
         token = create_access_token(data={"sub": str(farmer.id)})
         return TokenResponse(access_token=token, farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id))
     elif req.username:
-        admin = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+        clean_username = req.username.strip()
+        admin = db.query(AdminUser).filter(func.lower(AdminUser.username) == func.lower(clean_username)).first()
         if not admin:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin username.")
         if not verify_password(req.password, admin.password_hash):
@@ -210,8 +212,8 @@ def master_reset_operator_password(
     db: Session = Depends(get_db),
 ):
     """Master Admin endpoint to reset password for any operator or admin account."""
-    from models import RoleEnum
-    target_user = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+    clean_username = req.username.strip()
+    target_user = db.query(AdminUser).filter(func.lower(AdminUser.username) == func.lower(clean_username)).first()
     if not target_user:
         raise HTTPException(status_code=404, detail=f"User '{req.username}' not found")
 
@@ -219,8 +221,8 @@ def master_reset_operator_password(
     db.commit()
 
     return {
-        "message": f"Password for '{req.username}' reset successfully",
-        "username": req.username,
+        "message": f"Password for '{target_user.username}' reset successfully",
+        "username": target_user.username,
         "centre_id": target_user.centre_id,
     }
 
