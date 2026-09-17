@@ -57,6 +57,9 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE bookings ADD created_at DATETIME",
         "ALTER TABLE bookings ADD updated_at DATETIME",
         "ALTER TABLE admins ADD centre_id INT",
+        "ALTER TABLE notifications ADD booking_id INT",
+        "ALTER TABLE notifications ADD centre_id INT",
+        "ALTER TABLE notifications ADD updated_at DATETIME",
     ]
 
     results = []

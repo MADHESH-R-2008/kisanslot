@@ -1,78 +1,200 @@
-from fastapi import APIRouter, Depends, HTTPException
+import math
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
-from database import get_db
-from models import Notification, Farmer
-from auth import get_current_farmer
-from pydantic import BaseModel
-from typing import List
+from sqlalchemy import or_, and_
+from typing import List, Optional
 from datetime import datetime
+
+from database import get_db
+from models import Notification, NotificationPreference, RoleEnum
+from dependencies import get_current_user
+from schemas import (
+    NotificationResponse,
+    PaginatedNotificationResponse,
+    NotificationUnreadCountResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+)
 
 router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 
-class NotificationResponse(BaseModel):
-    id: int
-    title: str
-    message: str
-    type: str
-    is_read: bool
-    created_at: datetime
 
-    class Config:
-        from_attributes = True
+def build_user_notifications_query(db: Session, user: dict):
+    user_id = user["user_id"]
+    role = user["role"]
+    centre_id = user.get("centre_id")
 
-@router.get("/", response_model=List[NotificationResponse])
+    query = db.query(Notification)
+
+    if role == RoleEnum.FARMER.value:
+        query = query.filter(Notification.user_id == user_id)
+    elif role == RoleEnum.CENTRE_OPERATOR.value:
+        conditions = [Notification.user_id == user_id]
+        if centre_id:
+            conditions.append(Notification.centre_id == centre_id)
+        query = query.filter(or_(*conditions))
+    elif role in [RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
+        query = query.filter(
+            or_(
+                Notification.user_id == user_id,
+                Notification.type.in_(["SYSTEM", "CENTRE_UPDATE"]),
+                Notification.user_id.is_(None),
+            )
+        )
+    else:
+        query = query.filter(Notification.user_id == user_id)
+
+    return query
+
+
+@router.get("", response_model=PaginatedNotificationResponse)
+@router.get("/", response_model=PaginatedNotificationResponse)
 def get_notifications(
-    farmer: Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db)
+    unread_only: bool = Query(False),
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Get all notifications for the current farmer."""
-    notifications = db.query(Notification).filter(
-        Notification.user_id == farmer.id
-    ).order_by(Notification.created_at.desc()).all()
-    return notifications
+    """
+    Get notifications for the logged-in user with security filtering and pagination.
+    """
+    base_query = build_user_notifications_query(db, user)
+
+    unread_count = base_query.filter(Notification.is_read == False).count()
+
+    filtered_query = base_query
+    if unread_only:
+        filtered_query = filtered_query.filter(Notification.is_read == False)
+
+    total = filtered_query.count()
+    pages = math.ceil(total / limit) if total > 0 else 1
+    offset = (page - 1) * limit
+
+    items = (
+        filtered_query.order_by(Notification.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    return PaginatedNotificationResponse(
+        items=items,
+        total=total,
+        page=page,
+        limit=limit,
+        pages=pages,
+        unread_count=unread_count,
+    )
+
+
+@router.get("/unread-count", response_model=NotificationUnreadCountResponse)
+def get_unread_count(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Get the unread notification count for the current logged-in user.
+    """
+    base_query = build_user_notifications_query(db, user)
+    unread_count = base_query.filter(Notification.is_read == False).count()
+    return NotificationUnreadCountResponse(unread_count=unread_count)
+
 
 @router.put("/{notification_id}/read")
 def mark_notification_read(
     notification_id: int,
-    farmer: Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Mark a notification as read."""
-    notification = db.query(Notification).filter(
-        Notification.id == notification_id,
-        Notification.user_id == farmer.id
-    ).first()
+    """
+    Mark a specific notification as read for the current user.
+    """
+    base_query = build_user_notifications_query(db, user)
+    notification = base_query.filter(Notification.id == notification_id).first()
+
     if not notification:
-        raise HTTPException(status_code=404, detail="Notification not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Notification not found or access denied",
+        )
+
     notification.is_read = True
+    notification.updated_at = datetime.utcnow()
     db.commit()
-    return {"message": "Notification marked as read"}
+    return {
+        "message": "Notification marked as read",
+        "notification_id": notification_id,
+    }
+
 
 @router.put("/read-all")
 def mark_all_notifications_read(
-    farmer: Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db)
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Mark all notifications for the farmer as read."""
-    db.query(Notification).filter(
-        Notification.user_id == farmer.id,
-        Notification.is_read == False
-    ).update({Notification.is_read: True})
+    """
+    Mark all notifications for the current user as read.
+    """
+    base_query = build_user_notifications_query(db, user)
+    unread_notifications = base_query.filter(Notification.is_read == False).all()
+
+    for notif in unread_notifications:
+        notif.is_read = True
+        notif.updated_at = datetime.utcnow()
+
     db.commit()
-    return {"message": "All notifications marked as read"}
+    return {
+        "message": "All notifications marked as read",
+        "count": len(unread_notifications),
+    }
 
-class DeviceTokenRequest(BaseModel):
-    token: str
 
-@router.post("/device-token")
-def register_device_token(
-    req: DeviceTokenRequest,
-    farmer: Farmer = Depends(get_current_farmer),
-    db: Session = Depends(get_db)
+@router.get("/preferences", response_model=NotificationPreferenceResponse)
+def get_notification_preferences(
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
-    Placeholder endpoint to store a device token for future Firebase push notifications.
-    Currently not persisted; will be implemented later.
+    Get user notification preferences.
     """
-    # TODO: Save token to a new table if needed.
-    return {"message": "Device token received (placeholder)"}
+    user_id = user["user_id"]
+    pref = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+    if not pref:
+        pref = NotificationPreference(user_id=user_id)
+        db.add(pref)
+        db.commit()
+        db.refresh(pref)
+    return pref
+
+
+@router.put("/preferences", response_model=NotificationPreferenceResponse)
+def update_notification_preferences(
+    update_data: NotificationPreferenceUpdate,
+    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Update user notification preferences.
+    """
+    user_id = user["user_id"]
+    pref = db.query(NotificationPreference).filter(NotificationPreference.user_id == user_id).first()
+    if not pref:
+        pref = NotificationPreference(user_id=user_id)
+        db.add(pref)
+
+    if update_data.booking_notifications is not None:
+        pref.booking_notifications = update_data.booking_notifications
+    if update_data.queue_notifications is not None:
+        pref.queue_notifications = update_data.queue_notifications
+    if update_data.procurement_notifications is not None:
+        pref.procurement_notifications = update_data.procurement_notifications
+    if update_data.payment_notifications is not None:
+        pref.payment_notifications = update_data.payment_notifications
+    if update_data.system_notifications is not None:
+        pref.system_notifications = update_data.system_notifications
+
+    pref.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(pref)
+    return pref

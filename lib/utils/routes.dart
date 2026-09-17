@@ -12,6 +12,7 @@ import '../screens/queue_screen.dart';
 import '../screens/procurement_screen.dart';
 import '../screens/payment_screen.dart';
 import '../screens/profile_screen.dart';
+import '../screens/notification_screen.dart';
 import '../screens/admin_home_screen.dart';
 import '../screens/admin_procurement_screen.dart';
 
@@ -27,6 +28,7 @@ class AppRoutes {
   static const String procurement = '/procurement';
   static const String payment = '/payment';
   static const String profile = '/profile';
+  static const String notification = '/notifications';
   static const String adminHome = '/admin/home';
   static const String adminProcurement = '/admin/procurement';
 
@@ -60,6 +62,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const PaymentScreen());
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+      case notification:
+        return MaterialPageRoute(builder: (_) => const NotificationScreen());
       case adminHome:
         return MaterialPageRoute(builder: (_) => const AdminHomeScreen());
       case adminProcurement:

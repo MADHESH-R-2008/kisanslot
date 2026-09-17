@@ -343,3 +343,52 @@ class CounterUpdateRequest(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     is_available: Optional[bool] = None
+
+# ──────────────────────────────────────────────
+# Notification Schemas
+# ──────────────────────────────────────────────
+
+class NotificationResponse(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    booking_id: Optional[int] = None
+    centre_id: Optional[int] = None
+    type: str
+    title: str
+    message: str
+    is_read: bool
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class PaginatedNotificationResponse(BaseModel):
+    items: list[NotificationResponse]
+    total: int
+    page: int
+    limit: int
+    pages: int
+    unread_count: int
+
+class NotificationUnreadCountResponse(BaseModel):
+    unread_count: int
+
+class NotificationPreferenceResponse(BaseModel):
+    user_id: int
+    booking_notifications: bool = True
+    queue_notifications: bool = True
+    procurement_notifications: bool = True
+    payment_notifications: bool = True
+    system_notifications: bool = True
+
+    class Config:
+        from_attributes = True
+
+class NotificationPreferenceUpdate(BaseModel):
+    booking_notifications: Optional[bool] = None
+    queue_notifications: Optional[bool] = None
+    procurement_notifications: Optional[bool] = None
+    payment_notifications: Optional[bool] = None
+    system_notifications: Optional[bool] = None
+

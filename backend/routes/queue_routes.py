@@ -20,7 +20,7 @@ from services.queue_service import (
     WAITING_STATUSES, TERMINAL_STATUSES,
 )
 from services.booking_service import format_token_display
-from services.notification_service import send_notification
+from services.notification_service import create_notification
 from routes.ws_routes import manager
 
 router = APIRouter(prefix="/api/queue", tags=["Queue"])
@@ -29,6 +29,35 @@ router = APIRouter(prefix="/api/queue", tags=["Queue"])
 # ──────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────
+
+def notify_queue_position_update(db: Session, centre_id: int):
+    """Notify waiting farmers when their queue position is within threshold."""
+    today = date.today()
+    active_counters = get_active_counter_count(db, centre_id)
+    waiting_bookings = (
+        db.query(Booking)
+        .join(Slot, Booking.slot_id == Slot.id)
+        .filter(
+            Booking.centre_id == centre_id,
+            Slot.date == today,
+            Booking.status.in_(WAITING_STATUSES),
+        )
+        .order_by(Booking.token_number.asc())
+        .all()
+    )
+    for pos, b in enumerate(waiting_bookings, start=1):
+        if pos <= 5 or pos % 5 == 0:
+            wait_min = calculate_estimated_wait(pos - 1, active_counters)
+            token_display = format_token_display(b.centre_id, b.token_number)
+            create_notification(
+                db=db,
+                user_id=b.farmer_id,
+                notification_type="QUEUE_UPDATE",
+                title="Queue Updated",
+                message=f"Your token {token_display} is now position {pos}.\nEstimated wait: {wait_min} minutes.",
+                booking_id=b.id,
+                centre_id=centre_id,
+            )
 
 async def broadcast_queue_update(centre_id: int, db: Session, event: str = "QUEUE_UPDATED", extra: dict = None):
     """
@@ -509,14 +538,22 @@ async def call_next_farmer(
 
     # Send notification to farmer
     try:
-        counter_info = f" at {counter_name}" if counter_name else ""
-        send_notification(
-            db,
+        counter_label = counter_name if counter_name else f"Counter {counter_num}"
+        create_notification(
+            db=db,
             user_id=next_booking.farmer_id,
-            title="🔔 Your Token Has Been Called!",
-            message=f"Token {token_str} has been called{counter_info}. Please proceed immediately.",
-            type_str="QUEUE_CALL",
+            notification_type="FARMER_CALLED",
+            title="Your Turn",
+            message=f"Token {token_str} has been called.\nPlease proceed to {counter_label}.",
+            booking_id=next_booking.id,
+            centre_id=target_centre_id,
         )
+    except Exception:
+        pass
+
+    # Notify next waiting farmers of updated queue position if within threshold
+    try:
+        notify_queue_position_update(db, target_centre_id)
     except Exception:
         pass
 

@@ -395,13 +395,39 @@ class ApiService {
   //  Notifications APIs
   // ──────────────────────────────────────────────
 
-  /// Get notifications for logged-in user.
-  static Future<List<dynamic>> getNotifications() async {
+  /// Get notifications for logged-in user with pagination and optional unread filter.
+  static Future<Map<String, dynamic>> getNotifications({
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
     final response = await http.get(
-      Uri.parse('$baseUrl/api/notifications/'),
+      Uri.parse('$baseUrl/api/notifications?unread_only=$unreadOnly&page=$page&limit=$limit'),
       headers: await _authHeaders(),
     );
-    return _handleResponse(response);
+    final data = _handleResponse(response);
+    if (data is List) {
+      return {
+        'items': data,
+        'unread_count': data.where((n) => n['is_read'] == false).length,
+        'total': data.length,
+      };
+    }
+    return data;
+  }
+
+  /// Get real-time unread notification count.
+  static Future<int> getUnreadNotificationCount() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/notifications/unread-count'),
+        headers: await _authHeaders(),
+      );
+      final data = _handleResponse(response);
+      return data['unread_count'] ?? 0;
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// Mark notification as read.

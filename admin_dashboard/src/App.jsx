@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarDays, BarChart2,
-  LogOut, CheckSquare, Building2, Menu, X
+  LogOut, CheckSquare, Building2, Menu, X, Bell
 } from 'lucide-react';
+import { notificationAPI } from './services/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Queue from './pages/Queue';
@@ -106,6 +107,170 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   );
 };
 
+// ── Notification Dropdown ───────────────────────────────────────────────────
+const NotificationMenu = () => {
+  const [open, setOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationAPI.list();
+      const items = res.data.items || (Array.isArray(res.data) ? res.data : []);
+      const count = res.data.unread_count !== undefined
+        ? res.data.unread_count
+        : items.filter((n) => !n.is_read).length;
+      setNotifications(items);
+      setUnreadCount(count);
+    } catch (err) {
+      // Silently catch error if offline or unauthenticated
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleMarkRead = async (id, e) => {
+    e.stopPropagation();
+    try {
+      await notificationAPI.markRead(id);
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark read', err);
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await notificationAPI.markAllRead();
+      fetchNotifications();
+    } catch (err) {
+      console.error('Failed to mark all read', err);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="btn btn-secondary"
+        style={{
+          position: 'relative',
+          padding: '0.45rem 0.65rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.35rem',
+          borderRadius: 8,
+        }}
+        title="Notifications"
+      >
+        <Bell size={18} />
+        {unreadCount > 0 && (
+          <span style={{
+            position: 'absolute',
+            top: -4,
+            right: -4,
+            backgroundColor: 'var(--danger-color, #ef4444)',
+            color: 'white',
+            borderRadius: '10px',
+            fontSize: '0.7rem',
+            fontWeight: 700,
+            padding: '2px 6px',
+            lineHeight: 1,
+          }}>
+            {unreadCount}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute',
+          right: 0,
+          top: '120%',
+          width: 320,
+          maxHeight: 400,
+          backgroundColor: 'var(--bg-surface, #ffffff)',
+          border: '1px solid var(--border-color, #e2e8f0)',
+          borderRadius: 12,
+          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            padding: '0.75rem 1rem',
+            borderBottom: '1px solid var(--border-color, #e2e8f0)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'var(--bg-subtle, #f8fafc)',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)' }}>
+              Notifications {unreadCount > 0 && `(${unreadCount})`}
+            </div>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllRead}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--primary-color, #10b981)',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Mark all read
+              </button>
+            )}
+          </div>
+
+          <div style={{ overflowY: 'auto', flex: 1, padding: '0.5rem 0' }}>
+            {notifications.length === 0 ? (
+              <div style={{ padding: '1.5rem', textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                No notifications
+              </div>
+            ) : (
+              notifications.map((n) => (
+                <div
+                  key={n.id}
+                  style={{
+                    padding: '0.65rem 1rem',
+                    borderBottom: '1px solid var(--border-color, #f1f5f9)',
+                    backgroundColor: n.is_read ? 'transparent' : 'rgba(16, 185, 129, 0.06)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.2rem',
+                    cursor: 'pointer',
+                  }}
+                  onClick={(e) => !n.is_read && handleMarkRead(n.id, e)}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: n.is_read ? 600 : 700, fontSize: '0.85rem', color: 'var(--text-primary)' }}>
+                      {n.title}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>
+                      {new Date(n.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.3 }}>
+                    {n.message}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Layout ────────────────────────────────────────────────────────────────────
 const Layout = ({ children }) => {
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
@@ -137,7 +302,8 @@ const Layout = ({ children }) => {
       <div className="main-content">
         <div className="topbar">
           <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 600 }}>{pageTitle}</h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <NotificationMenu />
             <button
               className="btn btn-secondary"
               onClick={() => setIsDark(!isDark)}

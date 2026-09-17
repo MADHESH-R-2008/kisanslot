@@ -6,7 +6,7 @@ from models import Farmer, Booking, Slot, Centre, BookingStatusEnum
 from schemas import BookingCreateRequest, BookingResponse, BookingDetailResponse
 from auth import get_current_farmer
 from services.booking_service import generate_booking_id, generate_token_number, format_token_display
-from services.notification_service import send_notification
+from services.notification_service import create_notification
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
 
@@ -113,12 +113,14 @@ async def create_booking(
     # 10. Send notification to farmer
     try:
         token_display = format_token_display(req.centre_id, token_number)
-        send_notification(
-            db,
+        create_notification(
+            db=db,
             user_id=farmer.id,
-            title="📅 Booking Confirmed",
-            message=f"Token {token_display} confirmed at {centre.name} for {slot.date.strftime('%d %b %Y')} {slot.start_time.strftime('%H:%M')}-{slot.end_time.strftime('%H:%M')}.",
-            type_str="BOOKING_CONFIRMED",
+            notification_type="BOOKING_CONFIRMED",
+            title="Booking Confirmed",
+            message=f"Your slot at {centre.name} has been confirmed.\nToken: {token_display}",
+            booking_id=booking.id,
+            centre_id=centre.id,
         )
     except Exception:
         pass

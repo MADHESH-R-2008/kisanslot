@@ -91,7 +91,8 @@ export const procurementAPI = {
 
 // ── Notifications ─────────────────────────────────────────────────────────────
 export const notificationAPI = {
-  list: () => api.get('/notifications/'),
+  list: (params) => api.get('/notifications/', { params }),
+  getUnreadCount: () => api.get('/notifications/unread-count'),
   markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put('/notifications/read-all'),
 };

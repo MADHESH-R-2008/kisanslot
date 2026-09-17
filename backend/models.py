@@ -230,6 +230,18 @@ class AdminUser(Base):
     # Relationships
     centre = relationship("Centre")
 
+class NotificationTypeEnum(str, enum.Enum):
+    BOOKING_CONFIRMED = "BOOKING_CONFIRMED"
+    QUEUE_UPDATE = "QUEUE_UPDATE"
+    FARMER_CALLED = "FARMER_CALLED"
+    PROCUREMENT_STARTED = "PROCUREMENT_STARTED"
+    PROCUREMENT_COMPLETED = "PROCUREMENT_COMPLETED"
+    PAYMENT_PROCESSING = "PAYMENT_PROCESSING"
+    PAYMENT_COMPLETED = "PAYMENT_COMPLETED"
+    PAYMENT_FAILED = "PAYMENT_FAILED"
+    CENTRE_UPDATE = "CENTRE_UPDATE"
+    SYSTEM = "SYSTEM"
+
 # ──────────────────────────────────────────────
 # Notifications
 # ──────────────────────────────────────────────
@@ -238,12 +250,28 @@ class Notification(Base):
     __tablename__ = "notifications"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("farmers.id"), nullable=False) # Bound to farmers for now
+    user_id = Column(Integer, nullable=True, index=True)
+    booking_id = Column(Integer, ForeignKey("bookings.id"), nullable=True, index=True)
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=True, index=True)
+    type = Column(String(50), nullable=False, index=True, default="SYSTEM")
     title = Column(String(255), nullable=False)
     message = Column(Text, nullable=False)
-    type = Column(String(50), default="INFO")
-    is_read = Column(Boolean, default=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    is_read = Column(Boolean, default=False, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class NotificationPreference(Base):
+    __tablename__ = "notification_preferences"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, nullable=False, index=True, unique=True)
+    booking_notifications = Column(Boolean, default=True)
+    queue_notifications = Column(Boolean, default=True)
+    procurement_notifications = Column(Boolean, default=True)
+    payment_notifications = Column(Boolean, default=True)
+    system_notifications = Column(Boolean, default=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 # ──────────────────────────────────────────────
 # Audit Logs

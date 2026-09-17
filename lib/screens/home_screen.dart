@@ -19,6 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   FarmerModel? _farmer;
   BookingModel? _activeBooking;
+  int _unreadNotificationCount = 0;
   bool _isLoading = true;
   String? _error;
   WebSocketChannel? _channel;
@@ -109,6 +110,11 @@ class _HomeScreenState extends State<HomeScreen> {
         // No active booking, that's fine
         _activeBooking = null;
       }
+
+      // Fetch unread notification count
+      try {
+        _unreadNotificationCount = await ApiService.getUnreadNotificationCount();
+      } catch (_) {}
 
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {
@@ -243,7 +249,51 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 8),
+                  // Notification Bell with unread badge
+                  Stack(
+                    children: [
+                      IconButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, AppRoutes.notification).then((_) {
+                            _loadData();
+                          });
+                        },
+                        icon: const Icon(
+                          Icons.notifications_outlined,
+                          size: 26,
+                          color: AppColors.textPrimary,
+                        ),
+                        tooltip: 'Notifications',
+                      ),
+                      if (_unreadNotificationCount > 0)
+                        Positioned(
+                          right: 6,
+                          top: 6,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: AppColors.error,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              _unreadNotificationCount > 99 ? '99+' : '$_unreadNotificationCount',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 4),
                   GestureDetector(
                     onTap: () => Navigator.pushNamed(context, AppRoutes.profile),
                     child: Container(
