@@ -69,29 +69,27 @@ class StatusTimelineCard extends StatelessWidget {
               final step = entry.value;
               final isLast = index == steps.length - 1;
 
-              return IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Timeline Icon and vertical line
-                    Column(
-                      children: [
-                        _buildStepCircle(step.state, step.icon),
-                        if (!isLast)
-                          Expanded(
-                            child: Container(
-                              width: 2,
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              color: step.state == TimelineStepStatus.completed
-                                  ? AppColors.success
-                                  : (step.state == TimelineStepStatus.current
-                                      ? AppColors.warning
-                                      : AppColors.cardBorder),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 14),
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Timeline Icon and vertical line
+                  Column(
+                    children: [
+                      _buildStepCircle(step.state, step.icon),
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 38,
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          color: step.state == TimelineStepStatus.completed
+                              ? AppColors.success
+                              : (step.state == TimelineStepStatus.current
+                                  ? AppColors.warning
+                                  : AppColors.cardBorder),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 14),
 
                     // Step Info
                     Expanded(
@@ -142,9 +140,8 @@ class StatusTimelineCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-              );
-            }).toList(),
+                );
+              }).toList(),
           ),
         ],
       ),

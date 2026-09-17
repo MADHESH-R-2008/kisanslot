@@ -48,7 +48,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   void initState() {
     super.initState();
     _centre = widget.selectedCentre ?? ProcurementCentre.getMockCentres()[1];
-    _selectedDate = DateTime(2026, 8, 25);
+    _selectedDate = DateTime.now();
     _selectedCrop = 'Paddy';
     _quantityController = TextEditingController(text: '850');
     _vehicleController = TextEditingController(text: 'TN 01 AB 1234');

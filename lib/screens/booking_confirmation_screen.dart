@@ -258,23 +258,34 @@ class BookingConfirmationScreen extends StatelessWidget {
   }
 
   Widget _buildTicketDivider() {
-    return Stack(
-      children: [
-        Row(
-          children: List.generate(
-            30,
-            (index) => Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Container(
-                  height: 1.5,
-                  color: index % 2 == 0 ? Colors.transparent : AppColors.cardBorder,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+    return const SizedBox(
+      height: 2,
+      width: double.infinity,
+      child: CustomPaint(
+        painter: _DashedLinePainter(color: AppColors.cardBorder),
+      ),
     );
   }
+}
+
+class _DashedLinePainter extends CustomPainter {
+  final Color color;
+  const _DashedLinePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    const double dashWidth = 6;
+    const double dashSpace = 4;
+    double startX = 0;
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5;
+    while (startX < size.width) {
+      canvas.drawLine(Offset(startX, 0), Offset(startX + dashWidth, 0), paint);
+      startX += dashWidth + dashSpace;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
