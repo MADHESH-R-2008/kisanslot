@@ -69,6 +69,13 @@ class BookingModel {
     this.bankAccountHint = 'SBI ••• 4921',
   });
 
+  static double _parseDouble(dynamic val, double fallback) {
+    if (val == null) return fallback;
+    if (val is num) return val.toDouble();
+    if (val is String) return double.tryParse(val) ?? fallback;
+    return fallback;
+  }
+
   /// Create from booking detail API response
   factory BookingModel.fromJson(Map<String, dynamic> json) {
     final statusStr = (json['status'] ?? 'CONFIRMED').toString().toUpperCase();
@@ -121,7 +128,7 @@ class BookingModel {
       date: json['date'] ?? '',
       timeRange: json['time'] ?? '${json['start_time'] ?? ''} - ${json['end_time'] ?? ''}',
       crop: json['crop'] ?? '',
-      quantityKg: (json['quantity'] ?? json['expected_quantity'] ?? 0).toDouble(),
+      quantityKg: _parseDouble(json['quantity'] ?? json['expected_quantity'], 0.0),
       vehicleNumber: json['vehicle_number'] ?? '',
       queuePosition: json['queue_position'] ?? 0,
       farmersAhead: json['farmers_ahead'] ?? 0,
@@ -148,7 +155,7 @@ class BookingModel {
       date: json['date'] ?? '',
       timeRange: '${json['start_time'] ?? ''} - ${json['end_time'] ?? ''}',
       crop: json['crop'] ?? json['produce_type'] ?? '',
-      quantityKg: (json['quantity'] ?? json['expected_quantity'] ?? 0).toDouble(),
+      quantityKg: _parseDouble(json['quantity'] ?? json['expected_quantity'], 0.0),
       vehicleNumber: json['vehicle_number'] ?? '',
       queuePosition: tokNum,
       farmersAhead: tokNum > 0 ? tokNum - 1 : 0,

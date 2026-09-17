@@ -13,27 +13,46 @@ class TimeSlot {
     this.bookedCount = 10,
   });
 
+  static int _parseInt(dynamic val, int fallback) {
+    if (val == null) return fallback;
+    if (val is int) return val;
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val) ?? fallback;
+    return fallback;
+  }
+
   factory TimeSlot.fromJson(Map<String, dynamic> json) {
-    final available = json['available'] ?? (json['capacity'] ?? 25) - (json['booked_count'] ?? 0);
+    final cap = _parseInt(json['capacity'], 25);
+    final booked = _parseInt(json['booked_count'], 0);
+    final available = json['available'] != null 
+        ? _parseInt(json['available'], cap - booked)
+        : (cap - booked);
+
     final startTime = json['start_time'] ?? '09:00';
     final endTime = json['end_time'] ?? '10:00';
 
-    // Convert 24h times to display format
-    String formatTime(String t) {
-      final parts = t.split(':');
-      final hour = int.parse(parts[0]);
-      final minute = parts[1];
-      final period = hour >= 12 ? 'PM' : 'AM';
-      final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-      return '${displayHour.toString().padLeft(2, '0')}:$minute $period';
+    String formatTime(dynamic t) {
+      if (t == null) return '09:00 AM';
+      final str = t.toString().trim();
+      if (str.isEmpty) return '09:00 AM';
+      try {
+        final parts = str.split(':');
+        final hour = int.tryParse(parts[0]) ?? 9;
+        final minute = parts.length > 1 ? parts[1] : '00';
+        final period = hour >= 12 ? 'PM' : 'AM';
+        final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+        return '${displayHour.toString().padLeft(2, '0')}:${minute.padLeft(2, '0')} $period';
+      } catch (_) {
+        return str;
+      }
     }
 
     return TimeSlot(
-      id: json['id'],
+      id: _parseInt(json['id'], 0),
       timeRange: '${formatTime(startTime)} – ${formatTime(endTime)}',
-      isAvailable: (json['is_active'] ?? true) && available > 0,
-      capacity: json['capacity'] ?? 25,
-      bookedCount: json['booked_count'] ?? 0,
+      isAvailable: (json['is_active'] == true || json['is_active'] == 1 || json['is_active'] == null) && available > 0,
+      capacity: cap,
+      bookedCount: booked,
     );
   }
 
