@@ -4,7 +4,11 @@ import 'app_colors.dart';
 
 class AppTheme {
   static ThemeData get lightTheme {
-    final baseTextTheme = GoogleFonts.poppinsTextTheme();
+    // Runtime font fetching is disabled in main.dart, so this uses
+    // bundled/cached fonts only — no mid-frame async HTTP loads
+    final baseTextTheme = GoogleFonts.poppinsTextTheme(
+      ThemeData.light().textTheme,
+    );
 
     return ThemeData(
       useMaterial3: true,
