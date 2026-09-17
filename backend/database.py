@@ -50,6 +50,9 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE bookings ADD serving_at DATETIME",
         "ALTER TABLE bookings ADD completed_at DATETIME",
         "ALTER TABLE bookings ADD token_display VARCHAR(50)",
+        "ALTER TABLE bookings ADD arrival_time DATETIME",
+        "ALTER TABLE bookings ADD is_deleted BOOLEAN",
+        "ALTER TABLE admins ADD centre_id INT",
     ]
 
     results = []
