@@ -87,16 +87,16 @@ class CentreResponse(BaseModel):
     district: str
     state: str
     contact_number: Optional[str] = None
-    latitude: float
-    longitude: float
-    total_counters: int
-    active_counters: int
-    is_active: bool
-    is_paused: bool = False
-    distance_km: float
-    rating: float
-    queue_count: int = 0
-    estimated_wait_minutes: int = 0
+    latitude: Optional[float] = 0.0
+    longitude: Optional[float] = 0.0
+    total_counters: Optional[int] = 3
+    active_counters: Optional[int] = 3
+    is_active: Optional[bool] = True
+    is_paused: Optional[bool] = False
+    distance_km: Optional[float] = 0.0
+    rating: Optional[float] = 4.5
+    queue_count: Optional[int] = 0
+    estimated_wait_minutes: Optional[int] = 0
 
     class Config:
         from_attributes = True
