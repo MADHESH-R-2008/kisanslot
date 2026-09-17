@@ -128,7 +128,7 @@ class _AdminProcurementScreenState extends State<AdminProcurementScreen> {
                           const Text('Quality Assessment', style: TextStyle(fontWeight: FontWeight.bold)),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String>(
-                            value: _qualityStatus,
+                            initialValue: _qualityStatus,
                             decoration: const InputDecoration(border: OutlineInputBorder()),
                             items: const [
                               DropdownMenuItem(value: 'EXCELLENT', child: Text('Excellent (Grade A)')),

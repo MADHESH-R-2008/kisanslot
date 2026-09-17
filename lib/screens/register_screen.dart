@@ -266,7 +266,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 // Crop Dropdown
                 _buildFieldLabel('Primary Crop *'),
                 DropdownButtonFormField<String>(
-                  value: _selectedCrop,
+                  initialValue: _selectedCrop,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.grass_rounded),
                   ),

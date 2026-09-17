@@ -13,12 +13,30 @@ from schemas import CentreCreateRequest, CentreResponse, CentreUpdateRequest
 router = APIRouter(prefix="/api/centres", tags=["Centres"])
 
 
-from datetime import date
+import math
+
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    if lat1 is None or lon1 is None or lat2 is None or lon2 is None:
+        return 0.0
+    R = 6371.0  # Earth radius in kilometers
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = (
+        math.sin(dlat / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    )
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return round(R * c, 1)
+
 
 @router.get("", response_model=List[CentreResponse])
 @router.get("/", response_model=List[CentreResponse])
-def list_centres(db: Session = Depends(get_db)):
-    """List active and inactive centres for the app and dashboard."""
+def list_centres(
+    lat: Optional[float] = None,
+    lon: Optional[float] = None,
+    db: Session = Depends(get_db),
+):
+    """List active and inactive centres with dynamic real distance calculation."""
     try:
         centres = db.query(Centre).all()
         res = []
@@ -37,7 +55,15 @@ def list_centres(db: Session = Depends(get_db)):
                 )
             except Exception:
                 q_count = 0
-            
+
+            calc_dist = getattr(c, "distance_km", 0.0) or 0.0
+            c_lat = getattr(c, "latitude", None)
+            c_lon = getattr(c, "longitude", None)
+            if lat is not None and lon is not None and c_lat and c_lon:
+                computed = haversine_km(lat, lon, c_lat, c_lon)
+                if computed > 0:
+                    calc_dist = computed
+
             c_dict = {
                 "id": c.id,
                 "name": c.name,
@@ -46,13 +72,13 @@ def list_centres(db: Session = Depends(get_db)):
                 "district": c.district or "",
                 "state": c.state or "",
                 "contact_number": getattr(c, "contact_number", None),
-                "latitude": getattr(c, "latitude", 0.0) or 0.0,
-                "longitude": getattr(c, "longitude", 0.0) or 0.0,
+                "latitude": c_lat or 0.0,
+                "longitude": c_lon or 0.0,
                 "total_counters": getattr(c, "total_counters", 3) or 3,
                 "active_counters": getattr(c, "active_counters", 3) or 3,
                 "is_active": getattr(c, "is_active", True) if getattr(c, "is_active", True) is not None else True,
                 "is_paused": getattr(c, "is_paused", False) if getattr(c, "is_paused", False) is not None else False,
-                "distance_km": getattr(c, "distance_km", 0.0) or 0.0,
+                "distance_km": calc_dist,
                 "rating": getattr(c, "rating", 4.5) or 4.5,
                 "google_map_url": getattr(c, "google_map_url", None),
                 "queue_count": q_count,

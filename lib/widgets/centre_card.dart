@@ -204,7 +204,11 @@ class CentreCard extends StatelessWidget {
                         child: _buildMetricItem(
                           icon: Icons.near_me_outlined,
                           label: 'Distance',
-                          value: '${centre.distanceKm.toStringAsFixed(0)} km',
+                          value: centre.distanceKm <= 0
+                              ? 'Nearby'
+                              : (centre.distanceKm < 1.0
+                                  ? '${(centre.distanceKm * 1000).toStringAsFixed(0)} m'
+                                  : '${centre.distanceKm.toStringAsFixed(1)} km'),
                           color: AppColors.primary,
                         ),
                       ),

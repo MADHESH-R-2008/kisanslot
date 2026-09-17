@@ -45,6 +45,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       await ApiService.updateBookingStatus(bookingId, newStatus);
       _fetchQueue(); // Refresh list
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e'), backgroundColor: AppColors.error),
       );
@@ -114,7 +115,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: _getStatusColor(status).withOpacity(0.1),
+                    color: _getStatusColor(status).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Text(

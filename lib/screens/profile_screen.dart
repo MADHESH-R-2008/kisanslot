@@ -276,10 +276,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
                 ElevatedButton.icon(
                   onPressed: () async {
+                    final navigator = Navigator.of(context);
                     await ApiService.clearToken();
-                    if (mounted) {
-                      Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (route) => false);
-                    }
+                    navigator.pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
                   },
                   icon: const Icon(Icons.logout),
                   label: const Text('LOGOUT'),

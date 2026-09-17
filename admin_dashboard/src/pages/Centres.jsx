@@ -61,6 +61,9 @@ const CentreModal = ({ centre, onClose, onSave }) => {
           <div style={{ gridColumn: '1 / -1' }}>{field('Google Map URL / Link (Optional)', 'google_map_url', 'text', { placeholder: 'https://maps.google.com/?q=...' })}</div>
           {field('District *', 'district', 'text', { required: true })}
           {field('State *', 'state', 'text', { required: true })}
+          {field('Latitude (GPS)', 'latitude', 'number', { placeholder: 'e.g. 11.0168' })}
+          {field('Longitude (GPS)', 'longitude', 'number', { placeholder: 'e.g. 76.9558' })}
+          {field('Distance (km)', 'distance_km', 'number', { min: 0, placeholder: 'e.g. 4.5' })}
           {field('Total Counters', 'total_counters', 'number', { min: 1 })}
           {field('Active Counters', 'active_counters', 'number', { min: 0 })}
           {field('Is Active', 'is_active', 'checkbox', { checkLabel: 'Centre is active' })}
@@ -176,7 +179,12 @@ const Centres = () => {
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
                   <MapPin size={15} style={{ flexShrink: 0, marginTop: 2, color: 'var(--primary-color)' }} />
                   <div>
-                    {c.address}, {c.district}, {c.state}
+                    <strong>{c.address}</strong>, {c.district}, {c.state}
+                    {(c.latitude > 0 || c.longitude > 0) && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                        📍 GPS: {c.latitude?.toFixed(4)}, {c.longitude?.toFixed(4)}
+                      </div>
+                    )}
                     {c.google_map_url && (
                       <div style={{ marginTop: '0.25rem' }}>
                         <a href={c.google_map_url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary-color)', fontSize: '0.75rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '2px', textDecoration: 'underline' }}>
@@ -188,10 +196,10 @@ const Centres = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', backgroundColor: 'var(--bg-subtle, #f8fafc)', padding: '0.65rem 0.85rem', borderRadius: 8, fontSize: '0.8rem', marginBottom: '1rem' }}>
-                  <div>Counters: <strong>{c.active_counters}/{c.total_counters}</strong></div>
+                  <div>Distance: <strong>{c.distance_km != null ? `${c.distance_km} km` : 'N/A'}</strong></div>
                   <div>Live Queue: <strong>{c.queue_count ?? 0}</strong></div>
+                  <div>Counters: <strong>{c.active_counters}/{c.total_counters}</strong></div>
                   <div>Est. Wait: <strong>{c.estimated_wait_minutes ?? 0}m</strong></div>
-                  <div>Rating: <strong>⭐ {c.rating ?? 4.5}</strong></div>
                 </div>
               </div>
 
