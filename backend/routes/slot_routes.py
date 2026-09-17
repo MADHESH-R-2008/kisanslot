@@ -49,7 +49,7 @@ def list_slots(
     date: date = Query(..., description="Date in YYYY-MM-DD format"),
     db: Session = Depends(get_db),
 ):
-    """Return available slots for a given centre and date."""
+    """Return available slots for a given centre and date. Auto-generates standard slots if none exist."""
     slots = (
         db.query(Slot)
         .filter(
@@ -59,6 +59,39 @@ def list_slots(
         .order_by(Slot.start_time)
         .all()
     )
+
+    if not slots:
+        centre = db.query(Centre).filter(Centre.id == centre_id).first()
+        if centre and getattr(centre, "is_active", True):
+            slot_times = [
+                (time(9, 0), time(10, 0)),
+                (time(10, 0), time(11, 0)),
+                (time(11, 0), time(12, 0)),
+                (time(12, 0), time(13, 0)),
+                (time(14, 0), time(15, 0)),
+                (time(15, 0), time(16, 0)),
+            ]
+            for start, end in slot_times:
+                s = Slot(
+                    centre_id=centre_id,
+                    date=date,
+                    start_time=start,
+                    end_time=end,
+                    capacity=25,
+                    booked_count=0,
+                    is_active=True,
+                )
+                db.add(s)
+            try:
+                db.commit()
+                slots = (
+                    db.query(Slot)
+                    .filter(Slot.centre_id == centre_id, Slot.date == date)
+                    .order_by(Slot.start_time)
+                    .all()
+                )
+            except Exception:
+                db.rollback()
 
     return [_build_slot_response(s) for s in slots]
 

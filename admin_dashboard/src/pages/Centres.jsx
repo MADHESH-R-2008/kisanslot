@@ -1,6 +1,164 @@
 import { useState, useEffect } from 'react';
-import { centreAPI } from '../services/api';
-import { Plus, Edit2, Trash2, MapPin, RefreshCw, ExternalLink } from 'lucide-react';
+import { centreAPI, slotAPI } from '../services/api';
+import { Plus, Edit2, Trash2, MapPin, RefreshCw, ExternalLink, Calendar, Clock, CheckCircle, XCircle } from 'lucide-react';
+
+const SlotManagementModal = ({ centre, onClose }) => {
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [editingSlot, setEditingSlot] = useState(null);
+  const [newSlot, setNewSlot] = useState({ start_time: '16:00', end_time: '17:00', maximum_capacity: 25 });
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const fetchSlots = async () => {
+    setLoading(true);
+    try {
+      const res = await slotAPI.list(centre.id, selectedDate);
+      setSlots(res.data);
+    } catch (err) {
+      console.error('Failed to load slots', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSlots();
+  }, [centre.id, selectedDate]);
+
+  const handleToggleActive = async (slot) => {
+    try {
+      await slotAPI.update(slot.id, { is_active: !slot.is_active });
+      fetchSlots();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to update slot.');
+    }
+  };
+
+  const handleSaveCapacity = async (slot, newCap) => {
+    try {
+      await slotAPI.update(slot.id, { maximum_capacity: Number(newCap) });
+      setEditingSlot(null);
+      fetchSlots();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to update capacity.');
+    }
+  };
+
+  const handleCreateSlot = async (e) => {
+    e.preventDefault();
+    try {
+      await slotAPI.create({
+        centre_id: centre.id,
+        date: selectedDate,
+        start_time: newSlot.start_time,
+        end_time: newSlot.end_time,
+        maximum_capacity: Number(newSlot.maximum_capacity),
+        is_active: true,
+      });
+      setShowAddForm(false);
+      fetchSlots();
+    } catch (err) {
+      alert(err.response?.data?.detail || 'Failed to create slot.');
+    }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110, padding: '1rem' }}>
+      <div className="card glass animate-fade-in" style={{ width: '100%', maxWidth: '640px', padding: '1.75rem', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div>
+            <h3 style={{ margin: 0, fontSize: '1.2rem' }}>Manage Booking Slots</h3>
+            <p style={{ margin: '0.2rem 0 0', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{centre.name} (ID: {centre.code})</p>
+          </div>
+          <button className="btn btn-secondary" onClick={onClose} style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}>Close</button>
+        </div>
+
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1.25rem', backgroundColor: 'var(--bg-subtle, #f8fafc)', padding: '0.75rem', borderRadius: 8 }}>
+          <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Calendar size={16} /> Select Date:
+          </label>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            style={{ padding: '0.4rem 0.6rem', borderRadius: 6, border: '1px solid var(--border-color)', fontSize: '0.875rem' }}
+          />
+          <button className="btn btn-primary" onClick={() => setShowAddForm(!showAddForm)} style={{ marginLeft: 'auto', fontSize: '0.8rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Plus size={14} /> Add Custom Slot
+          </button>
+        </div>
+
+        {showAddForm && (
+          <form onSubmit={handleCreateSlot} style={{ backgroundColor: 'var(--card-bg)', border: '1px solid var(--border-color)', borderRadius: 8, padding: '1rem', marginBottom: '1.25rem', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end' }}>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Start Time</label>
+              <input type="time" value={newSlot.start_time} onChange={(e) => setNewSlot({ ...newSlot, start_time: e.target.value })} required style={{ width: '100%', padding: '0.4rem', borderRadius: 4, border: '1px solid var(--border-color)' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>End Time</label>
+              <input type="time" value={newSlot.end_time} onChange={(e) => setNewSlot({ ...newSlot, end_time: e.target.value })} required style={{ width: '100%', padding: '0.4rem', borderRadius: 4, border: '1px solid var(--border-color)' }} />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Max Capacity</label>
+              <input type="number" min="1" value={newSlot.maximum_capacity} onChange={(e) => setNewSlot({ ...newSlot, maximum_capacity: e.target.value })} required style={{ width: '100%', padding: '0.4rem', borderRadius: 4, border: '1px solid var(--border-color)' }} />
+            </div>
+            <button type="submit" className="btn btn-primary" style={{ padding: '0.45rem 0.85rem', fontSize: '0.8rem' }}>Save Slot</button>
+          </form>
+        )}
+
+        {loading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading slots...</div>
+        ) : slots.length === 0 ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-secondary)' }}>No slots found for this date.</div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {slots.map((s) => (
+              <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 1rem', borderRadius: 8, border: '1px solid var(--border-color)', backgroundColor: s.is_active ? 'var(--card-bg)' : '#f1f5f9' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <Clock size={16} color="var(--primary-color)" />
+                  <div>
+                    <strong style={{ fontSize: '0.95rem' }}>{s.start_time} - {s.end_time}</strong>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: 2 }}>
+                      Booked: <strong>{s.booked_count}</strong> / {s.maximum_capacity || s.capacity} | Available: <strong style={{ color: s.available > 0 ? 'green' : 'red' }}>{s.available}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  {editingSlot?.id === s.id ? (
+                    <div style={{ display: 'flex', gap: '0.35rem', alignItems: 'center' }}>
+                      <input
+                        type="number"
+                        defaultValue={s.maximum_capacity || s.capacity}
+                        id={`cap-${s.id}`}
+                        min={s.booked_count}
+                        style={{ width: 60, padding: '0.25rem', borderRadius: 4, border: '1px solid var(--border-color)', fontSize: '0.8rem' }}
+                      />
+                      <button className="btn btn-primary" onClick={() => handleSaveCapacity(s, document.getElementById(`cap-${s.id}`).value)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>Set</button>
+                      <button className="btn btn-secondary" onClick={() => setEditingSlot(null)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>Cancel</button>
+                    </div>
+                  ) : (
+                    <button className="btn btn-secondary" onClick={() => setEditingSlot(s)} style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}>Capacity</button>
+                  )}
+
+                  <button
+                    className={`btn ${s.is_active ? 'btn-secondary' : 'btn-primary'}`}
+                    onClick={() => handleToggleActive(s)}
+                    style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  >
+                    {s.is_active ? <XCircle size={13} color="red" /> : <CheckCircle size={13} color="green" />}
+                    {s.is_active ? 'Close' : 'Open'}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 const CentreModal = ({ centre, onClose, onSave }) => {
   const [form, setForm] = useState(
@@ -82,6 +240,7 @@ const Centres = () => {
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | 'create' | centre object
+  const [slotModalCentre, setSlotModalCentre] = useState(null);
   const role = localStorage.getItem('role');
   const assignedCentreId = Number(localStorage.getItem('centre_id'));
   const canCreateCentres = role === 'ADMIN' || role === 'SUPER_ADMIN';
@@ -139,7 +298,7 @@ const Centres = () => {
         <div>
           <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Procurement Centres</h2>
           <p style={{ margin: '0.25rem 0 0', color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
-            Manage procurement centres, location links, and counter capacities
+            Manage procurement centres, location links, and booking slots
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -204,6 +363,9 @@ const Centres = () => {
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem', marginTop: '0.5rem' }}>
+                <button className="btn btn-secondary" onClick={() => setSlotModalCentre(c)} style={{ flex: 1, padding: '0.4rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
+                  <Clock size={14} /> Slots
+                </button>
                 <button className="btn btn-secondary" onClick={() => setModal(c)} style={{ flex: 1, padding: '0.4rem', fontSize: '0.8rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}>
                   <Edit2 size={14} /> Edit
                 </button>
@@ -219,6 +381,7 @@ const Centres = () => {
       )}
 
       {modal && <CentreModal centre={modal === 'create' ? null : modal} onClose={() => setModal(null)} onSave={handleSave} />}
+      {slotModalCentre && <SlotManagementModal centre={slotModalCentre} onClose={() => setSlotModalCentre(null)} />}
     </div>
   );
 };
