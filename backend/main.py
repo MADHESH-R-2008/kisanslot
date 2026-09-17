@@ -16,8 +16,14 @@ from routes import (
     counter_routes,
 )
 
-# Create all tables on startup
+from database import engine, Base, ensure_schema_up_to_date
+
+# Create all tables & auto-migrate missing columns on startup
 Base.metadata.create_all(bind=engine)
+try:
+    ensure_schema_up_to_date(engine)
+except Exception:
+    pass
 
 app = FastAPI(
     title="KisanSlot API",

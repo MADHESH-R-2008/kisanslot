@@ -30,3 +30,29 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+def ensure_schema_up_to_date(bind_engine):
+    """Safely auto-migrate missing columns for MySQL/PostgreSQL/SQLite."""
+    from sqlalchemy import text
+    migrations = [
+        ("centres", "contact_number", "VARCHAR(20)", "NULL"),
+        ("centres", "is_paused", "BOOLEAN", "FALSE"),
+        ("centres", "total_counters", "INT", "3"),
+        ("centres", "active_counters", "INT", "3"),
+        ("centres", "distance_km", "FLOAT", "0.0"),
+        ("centres", "rating", "FLOAT", "4.5"),
+        ("bookings", "assigned_counter", "INT", "NULL"),
+        ("bookings", "call_time", "DATETIME", "NULL"),
+        ("bookings", "serving_at", "DATETIME", "NULL"),
+        ("bookings", "completed_at", "DATETIME", "NULL"),
+        ("bookings", "token_display", "VARCHAR(50)", "''"),
+    ]
+
+    with bind_engine.connect() as conn:
+        for table, column, col_type, default in migrations:
+            try:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {col_type} DEFAULT {default};"))
+                conn.commit()
+            except Exception:
+                pass
