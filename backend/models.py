@@ -88,6 +88,7 @@ class Centre(Base):
     is_paused = Column(Boolean, default=False)
     distance_km = Column(Float, default=0.0)
     rating = Column(Float, default=4.5)
+    google_map_url = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     __table_args__ = (UniqueConstraint("code", name="uq_centre_code"),)
 

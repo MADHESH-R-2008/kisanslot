@@ -42,6 +42,7 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE centres ADD active_counters INT",
         "ALTER TABLE centres ADD distance_km FLOAT",
         "ALTER TABLE centres ADD rating FLOAT",
+        "ALTER TABLE centres ADD google_map_url TEXT",
         "ALTER TABLE counters ADD current_booking_id INT",
         "ALTER TABLE counters ADD is_available BOOLEAN",
         "ALTER TABLE counters ADD is_deleted BOOLEAN",

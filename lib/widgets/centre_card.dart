@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/centre.dart';
 import '../utils/app_colors.dart';
+import '../utils/map_launcher.dart';
 import 'custom_button.dart';
 
 class CentreCard extends StatelessWidget {
@@ -129,22 +130,62 @@ class CentreCard extends StatelessWidget {
                 ),
 
                 const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on_outlined, size: 16, color: AppColors.textSecondary),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        centre.address,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppColors.textSecondary,
+                InkWell(
+                  onTap: () {
+                    MapLauncher.openGoogleMaps(
+                      mapUrl: centre.googleMapUrl,
+                      latitude: centre.latitude,
+                      longitude: centre.longitude,
+                      name: centre.name,
+                      address: centre.address,
+                      context: context,
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on_rounded, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            centre.address,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                              decoration: TextDecoration.underline,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                        const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.infoContainer,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.directions_outlined, size: 12, color: AppColors.info),
+                              SizedBox(width: 2),
+                              Text(
+                                'Maps ↗',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.info,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
 
                 const SizedBox(height: 16),
@@ -197,12 +238,41 @@ class CentreCard extends StatelessWidget {
 
                 const SizedBox(height: 16),
 
-                // Action Button
-                CustomButton(
-                  text: 'View Slots',
-                  icon: Icons.calendar_month_outlined,
-                  variant: isRec ? ButtonVariant.secondary : ButtonVariant.primary,
-                  onPressed: onViewSlots,
+                // Action Buttons Row
+                Row(
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        MapLauncher.openGoogleMaps(
+                          mapUrl: centre.googleMapUrl,
+                          latitude: centre.latitude,
+                          longitude: centre.longitude,
+                          name: centre.name,
+                          address: centre.address,
+                          context: context,
+                        );
+                      },
+                      icon: const Icon(Icons.map_rounded, size: 16, color: AppColors.primary),
+                      label: const Text(
+                        'Directions',
+                        style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: CustomButton(
+                        text: 'View Slots',
+                        icon: Icons.calendar_month_outlined,
+                        variant: isRec ? ButtonVariant.secondary : ButtonVariant.primary,
+                        onPressed: onViewSlots,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),

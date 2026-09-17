@@ -9,6 +9,9 @@ class ProcurementCentre {
   final bool isOpen;
   final int activeCounters;
   final double rating;
+  final String? googleMapUrl;
+  final double? latitude;
+  final double? longitude;
 
   const ProcurementCentre({
     required this.id,
@@ -21,6 +24,9 @@ class ProcurementCentre {
     this.isOpen = true,
     this.activeCounters = 3,
     this.rating = 4.8,
+    this.googleMapUrl,
+    this.latitude,
+    this.longitude,
   });
 
   factory ProcurementCentre.fromJson(Map<String, dynamic> json) {
@@ -36,6 +42,9 @@ class ProcurementCentre {
       isOpen: json['is_active'] ?? true,
       activeCounters: json['active_counters'] ?? 3,
       rating: (json['rating'] ?? 4.5).toDouble(),
+      googleMapUrl: json['google_map_url'],
+      latitude: (json['latitude'] != null) ? (json['latitude'] as num).toDouble() : null,
+      longitude: (json['longitude'] != null) ? (json['longitude'] as num).toDouble() : null,
     );
   }
 

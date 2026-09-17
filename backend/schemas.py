@@ -99,6 +99,7 @@ class CentreResponse(BaseModel):
     is_paused: Optional[bool] = False
     distance_km: Optional[float] = 0.0
     rating: Optional[float] = 4.5
+    google_map_url: Optional[str] = None
     queue_count: Optional[int] = 0
     estimated_wait_minutes: Optional[int] = 0
 
@@ -123,6 +124,7 @@ class CentreCreateRequest(BaseModel):
     is_paused: Optional[bool] = False
     distance_km: Optional[float] = 0.0
     rating: Optional[float] = 4.5
+    google_map_url: Optional[str] = None
 
 class CentreUpdateRequest(BaseModel):
     name: Optional[str] = None
@@ -139,6 +141,7 @@ class CentreUpdateRequest(BaseModel):
     is_paused: Optional[bool] = None
     distance_km: Optional[float] = None
     rating: Optional[float] = None
+    google_map_url: Optional[str] = None
 
 # ──────────────────────────────────────────────
 # ──────────────────────────────────────────────

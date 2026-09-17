@@ -54,6 +54,7 @@ def list_centres(db: Session = Depends(get_db)):
                 "is_paused": getattr(c, "is_paused", False) if getattr(c, "is_paused", False) is not None else False,
                 "distance_km": getattr(c, "distance_km", 0.0) or 0.0,
                 "rating": getattr(c, "rating", 4.5) or 4.5,
+                "google_map_url": getattr(c, "google_map_url", None),
                 "queue_count": q_count,
                 "estimated_wait_minutes": q_count * 6,
             }
@@ -90,6 +91,7 @@ def create_centre(
         is_paused=payload.is_paused,
         distance_km=payload.distance_km,
         rating=payload.rating,
+        google_map_url=payload.google_map_url,
     )
     db.add(centre)
     try:
