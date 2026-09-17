@@ -49,10 +49,9 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE bookings ADD token_display VARCHAR(50)",
     ]
 
-    with bind_engine.connect() as conn:
-        for stmt in statements:
-            try:
+    for stmt in statements:
+        try:
+            with bind_engine.begin() as conn:
                 conn.execute(text(stmt))
-                conn.commit()
-            except Exception:
-                pass
+        except Exception:
+            pass
