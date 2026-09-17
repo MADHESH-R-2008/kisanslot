@@ -13,11 +13,55 @@ from schemas import CentreCreateRequest, CentreResponse, CentreUpdateRequest
 router = APIRouter(prefix="/api/centres", tags=["Centres"])
 
 
+from datetime import date
+
 @router.get("", response_model=List[CentreResponse])
 @router.get("/", response_model=List[CentreResponse])
 def list_centres(db: Session = Depends(get_db)):
     """List active and inactive centres for the app and dashboard."""
-    return db.query(Centre).all()
+    try:
+        centres = db.query(Centre).all()
+        res = []
+        for c in centres:
+            try:
+                today = date.today()
+                q_count = (
+                    db.query(Booking)
+                    .join(Slot, Booking.slot_id == Slot.id)
+                    .filter(
+                        Booking.centre_id == c.id,
+                        Slot.date == today,
+                        Booking.status.in_(["WAITING", "CALLED", "SERVING", "CONFIRMED"]),
+                    )
+                    .count()
+                )
+            except Exception:
+                q_count = 0
+            
+            c_dict = {
+                "id": c.id,
+                "name": c.name,
+                "code": c.code,
+                "address": c.address or "",
+                "district": c.district or "",
+                "state": c.state or "",
+                "contact_number": getattr(c, "contact_number", None),
+                "latitude": getattr(c, "latitude", 0.0) or 0.0,
+                "longitude": getattr(c, "longitude", 0.0) or 0.0,
+                "total_counters": getattr(c, "total_counters", 3) or 3,
+                "active_counters": getattr(c, "active_counters", 3) or 3,
+                "is_active": getattr(c, "is_active", True) if getattr(c, "is_active", True) is not None else True,
+                "is_paused": getattr(c, "is_paused", False) if getattr(c, "is_paused", False) is not None else False,
+                "distance_km": getattr(c, "distance_km", 0.0) or 0.0,
+                "rating": getattr(c, "rating", 4.5) or 4.5,
+                "queue_count": q_count,
+                "estimated_wait_minutes": q_count * 6,
+            }
+            res.append(c_dict)
+        return res
+    except Exception as e:
+        import traceback
+        raise HTTPException(status_code=500, detail=f"Centre list error: {str(e)} | Trace: {traceback.format_exc()}")
 
 
 @router.post("", response_model=CentreResponse, status_code=status.HTTP_201_CREATED)
