@@ -33,7 +33,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppColors.successContainer,
                   shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3), width: 2),
+                  border: Border.all(color: AppColors.success.withOpacity(0.3), width: 2),
                 ),
                 child: const Icon(
                   Icons.check_circle_rounded,
@@ -71,7 +71,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                   border: Border.all(color: AppColors.cardBorder),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.08),
+                      color: AppColors.primary.withOpacity(0.08),
                       blurRadius: 16,
                       offset: const Offset(0, 6),
                     ),
@@ -120,7 +120,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: Colors.white.withOpacity(0.2),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Column(

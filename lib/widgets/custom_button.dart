@@ -67,7 +67,7 @@ class CustomButton extends StatelessWidget {
           backgroundColor: getBgColor(),
           foregroundColor: getTextColor(),
           elevation: variant == ButtonVariant.outlined ? 0 : 2,
-          shadowColor: getBgColor().withValues(alpha: 0.3),
+          shadowColor: getBgColor().withOpacity(0.3),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(borderRadius),
             side: getBorderSide(),

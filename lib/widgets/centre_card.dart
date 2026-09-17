@@ -34,8 +34,8 @@ class CentreCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isRec
-                ? AppColors.secondary.withValues(alpha: 0.12)
-                : Colors.black.withValues(alpha: 0.04),
+                ? AppColors.secondary.withOpacity(0.12)
+                : Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

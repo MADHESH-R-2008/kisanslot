@@ -25,7 +25,7 @@ class MapPlaceholderWidget extends StatelessWidget {
         border: Border.all(color: AppColors.cardBorder),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -115,10 +115,10 @@ class MapPlaceholderWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.92),
+                  color: Colors.white.withOpacity(0.92),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4),
+                    BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4),
                   ],
                 ),
                 child: const Row(
@@ -146,7 +146,7 @@ class MapPlaceholderWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.85),
+                  color: Colors.white.withOpacity(0.85),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Text(
@@ -180,7 +180,7 @@ class MapPlaceholderWidget extends StatelessWidget {
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
+                  color: Colors.black.withOpacity(0.12),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
@@ -215,7 +215,7 @@ class _MapGridPainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     final highwayPaint = Paint()
-      ..color = const Color(0xFFFED7AA).withValues(alpha: 0.7)
+      ..color = const Color(0xFFFED7AA).withOpacity(0.7)
       ..strokeWidth = 5
       ..style = PaintingStyle.stroke;
 
@@ -231,7 +231,7 @@ class _MapGridPainter extends CustomPainter {
     canvas.drawPath(path2, roadPaint);
 
     final greenZone = Paint()
-      ..color = const Color(0xFFC8E6C9).withValues(alpha: 0.35)
+      ..color = const Color(0xFFC8E6C9).withOpacity(0.35)
       ..style = PaintingStyle.fill;
 
     canvas.drawCircle(Offset(size.width * 0.75, size.height * 0.3), 35, greenZone);
