@@ -109,15 +109,25 @@ class _CentreScreenState extends State<CentreScreen> {
 
       _currentPosition = position;
       List<ProcurementCentre> updated = _centres.map((centre) {
-        if (centre.latitude != null && centre.longitude != null) {
-          double meters = Geolocator.distanceBetween(
-            position.latitude,
-            position.longitude,
-            centre.latitude!,
-            centre.longitude!,
-          );
-          double distKm = double.parse((meters / 1000.0).toStringAsFixed(1));
-          return centre.copyWithDistance(distKm);
+        if (centre.latitude != null &&
+            centre.longitude != null &&
+            centre.latitude != 0.0 &&
+            centre.longitude != 0.0) {
+          try {
+            double meters = Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              centre.latitude!,
+              centre.longitude!,
+            );
+            if (meters.isNaN || meters.isInfinite) return centre;
+            double distKm = meters / 1000.0;
+            if (distKm.isNaN || distKm.isInfinite) return centre;
+            distKm = double.tryParse(distKm.toStringAsFixed(1)) ?? centre.distanceKm;
+            return centre.copyWithDistance(distKm);
+          } catch (_) {
+            return centre;
+          }
         }
         return centre;
       }).toList();
@@ -125,7 +135,8 @@ class _CentreScreenState extends State<CentreScreen> {
       if (mounted) {
         setState(() {
           _centres = updated;
-          _locationStatus = 'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
+          _locationStatus =
+              'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
         });
       }
     } catch (_) {}
@@ -133,12 +144,18 @@ class _CentreScreenState extends State<CentreScreen> {
 
   @override
   Widget build(BuildContext context) {
-    List<ProcurementCentre> filteredCentres = _centres;
-    if (_selectedFilter == 'Nearest') {
-      filteredCentres = [..._centres]..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-    } else if (_selectedFilter == 'Shortest Queue') {
-      filteredCentres = [..._centres]..sort((a, b) => a.queueCount.compareTo(b.queueCount));
-    }
+    List<ProcurementCentre> filteredCentres = List<ProcurementCentre>.from(_centres);
+    try {
+      if (_selectedFilter == 'Nearest') {
+        filteredCentres.sort((a, b) {
+          final aDist = (a.distanceKm.isNaN || a.distanceKm.isInfinite) ? 9999.0 : a.distanceKm;
+          final bDist = (b.distanceKm.isNaN || b.distanceKm.isInfinite) ? 9999.0 : b.distanceKm;
+          return aDist.compareTo(bDist);
+        });
+      } else if (_selectedFilter == 'Shortest Queue') {
+        filteredCentres.sort((a, b) => a.queueCount.compareTo(b.queueCount));
+      }
+    } catch (_) {}
 
     return Scaffold(
       backgroundColor: AppColors.background,
