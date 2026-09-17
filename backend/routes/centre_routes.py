@@ -39,6 +39,12 @@ def list_centres(
     """List active and inactive centres with dynamic real distance calculation."""
     try:
         centres = db.query(Centre).all()
+        if not centres:
+            try:
+                from seed import _ensure_centres
+                centres = _ensure_centres(db)
+            except Exception:
+                centres = db.query(Centre).all()
         res = []
         for c in centres:
             try:

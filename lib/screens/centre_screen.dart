@@ -72,40 +72,63 @@ class _CentreScreenState extends State<CentreScreen> {
     });
 
     try {
-      Position? position = await _determinePosition();
-      _currentPosition = position;
-
-      final data = await ApiService.getCentres(
-        lat: position?.latitude,
-        lon: position?.longitude,
-      );
-
+      final data = await ApiService.getCentres();
       List<ProcurementCentre> loaded = data.map((json) => ProcurementCentre.fromJson(json)).toList();
 
-      if (position != null) {
-        loaded = loaded.map((centre) {
-          if (centre.latitude != null && centre.longitude != null) {
-            double meters = Geolocator.distanceBetween(
-              position.latitude,
-              position.longitude,
-              centre.latitude!,
-              centre.longitude!,
-            );
-            double distKm = double.parse((meters / 1000.0).toStringAsFixed(1));
-            return centre.copyWithDistance(distKm);
-          }
-          return centre;
-        }).toList();
-        _locationStatus = 'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
+      if (loaded.isEmpty) {
+        loaded = ProcurementCentre.getMockCentres();
       }
 
       _centres = loaded;
       if (mounted) setState(() => _isLoading = false);
-    } on ApiException catch (e) {
-      if (mounted) setState(() { _isLoading = false; _error = e.message; });
-    } catch (e) {
-      if (mounted) setState(() { _isLoading = false; _error = 'Unable to load centres. Check your connection.'; });
+
+      _updateLocationAndDistances();
+    } on ApiException catch (_) {
+      if (mounted) {
+        setState(() {
+          _centres = ProcurementCentre.getMockCentres();
+          _isLoading = false;
+        });
+        _updateLocationAndDistances();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _centres = ProcurementCentre.getMockCentres();
+          _isLoading = false;
+        });
+        _updateLocationAndDistances();
+      }
     }
+  }
+
+  Future<void> _updateLocationAndDistances() async {
+    try {
+      Position? position = await _determinePosition();
+      if (position == null || !mounted) return;
+
+      _currentPosition = position;
+      List<ProcurementCentre> updated = _centres.map((centre) {
+        if (centre.latitude != null && centre.longitude != null) {
+          double meters = Geolocator.distanceBetween(
+            position.latitude,
+            position.longitude,
+            centre.latitude!,
+            centre.longitude!,
+          );
+          double distKm = double.parse((meters / 1000.0).toStringAsFixed(1));
+          return centre.copyWithDistance(distKm);
+        }
+        return centre;
+      }).toList();
+
+      if (mounted) {
+        setState(() {
+          _centres = updated;
+          _locationStatus = 'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
+        });
+      }
+    } catch (_) {}
   }
 
   @override
