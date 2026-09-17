@@ -29,6 +29,24 @@ class ProcurementCentre {
     this.longitude,
   });
 
+  ProcurementCentre copyWithDistance(double newDistanceKm) {
+    return ProcurementCentre(
+      id: id,
+      name: name,
+      distanceKm: newDistanceKm,
+      queueCount: queueCount,
+      waitMin: waitMin,
+      isRecommended: isRecommended,
+      address: address,
+      isOpen: isOpen,
+      activeCounters: activeCounters,
+      rating: rating,
+      googleMapUrl: googleMapUrl,
+      latitude: latitude,
+      longitude: longitude,
+    );
+  }
+
   factory ProcurementCentre.fromJson(Map<String, dynamic> json) {
     final qCount = json['queue_count'] ?? 0;
     return ProcurementCentre(

@@ -241,10 +241,14 @@ class ApiService {
   //  Centre APIs
   // ──────────────────────────────────────────────
 
-  /// Get all active procurement centres.
-  static Future<List<dynamic>> getCentres() async {
+  /// Get all active procurement centres with optional location-based distance.
+  static Future<List<dynamic>> getCentres({double? lat, double? lon}) async {
+    String url = '$baseUrl/api/centres';
+    if (lat != null && lon != null) {
+      url += '?lat=$lat&lon=$lon';
+    }
     final response = await http.get(
-      Uri.parse('$baseUrl/api/centres'),
+      Uri.parse(url),
       headers: await _authHeaders(),
     );
     return _handleResponse(response);

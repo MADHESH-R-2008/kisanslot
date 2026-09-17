@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/centre.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -20,6 +21,8 @@ class _CentreScreenState extends State<CentreScreen> {
   List<ProcurementCentre> _centres = [];
   bool _isLoading = true;
   String? _error;
+  Position? _currentPosition;
+  String? _locationStatus;
 
   @override
   void initState() {
@@ -27,15 +30,76 @@ class _CentreScreenState extends State<CentreScreen> {
     _loadCentres();
   }
 
+  Future<Position?> _determinePosition() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) setState(() => _locationStatus = 'Location services disabled. Using default distances.');
+        return null;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) setState(() => _locationStatus = 'Location permission denied. Using default distances.');
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) setState(() => _locationStatus = 'Location permission permanently denied.');
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 4),
+        ),
+      );
+    } catch (_) {
+      if (mounted) setState(() => _locationStatus = 'Could not fetch live GPS position.');
+      return null;
+    }
+  }
+
   Future<void> _loadCentres() async {
     setState(() {
       _isLoading = true;
       _error = null;
+      _locationStatus = null;
     });
 
     try {
-      final data = await ApiService.getCentres();
-      _centres = data.map((json) => ProcurementCentre.fromJson(json)).toList();
+      Position? position = await _determinePosition();
+      _currentPosition = position;
+
+      final data = await ApiService.getCentres(
+        lat: position?.latitude,
+        lon: position?.longitude,
+      );
+
+      List<ProcurementCentre> loaded = data.map((json) => ProcurementCentre.fromJson(json)).toList();
+
+      if (position != null) {
+        loaded = loaded.map((centre) {
+          if (centre.latitude != null && centre.longitude != null) {
+            double meters = Geolocator.distanceBetween(
+              position.latitude,
+              position.longitude,
+              centre.latitude!,
+              centre.longitude!,
+            );
+            double distKm = double.parse((meters / 1000.0).toStringAsFixed(1));
+            return centre.copyWithDistance(distKm);
+          }
+          return centre;
+        }).toList();
+        _locationStatus = 'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
+      }
+
+      _centres = loaded;
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {
       if (mounted) setState(() { _isLoading = false; _error = e.message; });
@@ -122,7 +186,47 @@ class _CentreScreenState extends State<CentreScreen> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        // Location status banner
+                        if (_locationStatus != null)
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _currentPosition != null ? Colors.green.shade50 : Colors.amber.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: _currentPosition != null ? Colors.green.shade200 : Colors.amber.shade200,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  _currentPosition != null ? Icons.my_location_rounded : Icons.location_off_rounded,
+                                  size: 16,
+                                  color: _currentPosition != null ? Colors.green.shade700 : Colors.amber.shade800,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _locationStatus!,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: _currentPosition != null ? Colors.green.shade900 : Colors.amber.shade900,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: _loadCentres,
+                                  child: Icon(
+                                    Icons.refresh_rounded,
+                                    size: 16,
+                                    color: _currentPosition != null ? Colors.green.shade700 : Colors.amber.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
 
                         // Subtitle
                         Row(
