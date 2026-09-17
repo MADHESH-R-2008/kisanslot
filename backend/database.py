@@ -36,6 +36,8 @@ def ensure_schema_up_to_date(bind_engine):
     """Safely auto-migrate missing columns for MySQL/PostgreSQL/SQLite."""
     from sqlalchemy import text
     statements = [
+        "ALTER TABLE centres ADD latitude FLOAT",
+        "ALTER TABLE centres ADD longitude FLOAT",
         "ALTER TABLE centres ADD contact_number VARCHAR(20)",
         "ALTER TABLE centres ADD is_paused BOOLEAN",
         "ALTER TABLE centres ADD total_counters INT",
