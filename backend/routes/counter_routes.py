@@ -68,11 +68,15 @@ def list_counters_by_centre(
 
 @router.post("/", response_model=CounterResponse)
 def create_counter(req: CounterCreateRequest, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
-    centre_id = admin.centre_id
-    if not centre_id:
-        raise HTTPException(status_code=400, detail="Admin not assigned to a centre")
+    target_centre_id = req.centre_id or admin.centre_id
+    if not target_centre_id:
+        raise HTTPException(status_code=400, detail="Centre ID is required to create a counter")
+
+    if admin.role.value == "CENTRE_OPERATOR" and admin.centre_id != target_centre_id:
+        raise HTTPException(status_code=403, detail="Not authorized to create counter for this centre")
+
     counter = Counter(
-        centre_id=centre_id,
+        centre_id=target_centre_id,
         name=req.name,
         status=req.status if req.status else "ACTIVE",
         is_available=req.is_available if req.is_available is not None else True,
@@ -136,7 +140,11 @@ def toggle_counter(counter_id: int, admin: AdminUser = Depends(get_current_admin
 @router.delete("/{counter_id}")
 def delete_counter(counter_id: int, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     centre_id = admin.centre_id
-    counter = db.query(Counter).filter(Counter.id == counter_id, Counter.centre_id == centre_id, Counter.is_deleted == False).first()
+    if admin.role.value in ["ADMIN", "SUPER_ADMIN"]:
+        counter = db.query(Counter).filter(Counter.id == counter_id, Counter.is_deleted == False).first()
+    else:
+        counter = db.query(Counter).filter(Counter.id == counter_id, Counter.centre_id == centre_id, Counter.is_deleted == False).first()
+
     if not counter:
         raise HTTPException(status_code=404, detail="Counter not found")
     counter.is_deleted = True

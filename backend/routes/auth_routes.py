@@ -7,7 +7,7 @@ from database import get_db
 from models import Farmer, AdminUser
 from schemas import (
     FarmerRegisterRequest, FarmerLoginRequest, TokenResponse, FarmerBrief,
-    AdminLoginRequest, AdminTokenResponse
+    AdminLoginRequest, AdminTokenResponse, MasterPasswordResetRequest
 )
 from auth import hash_password, verify_password, create_access_token
 
@@ -201,5 +201,26 @@ def reset_admin_credentials(db: Session = Depends(get_db)):
     return {
         "status": "Admin and Centre Operator credentials reset successfully",
         "accounts": reset_summary,
+    }
+
+
+@router.post("/master/reset-operator-password", tags=["Authentication"])
+def master_reset_operator_password(
+    req: MasterPasswordResetRequest,
+    db: Session = Depends(get_db),
+):
+    """Master Admin endpoint to reset password for any operator or admin account."""
+    from models import RoleEnum
+    target_user = db.query(AdminUser).filter(AdminUser.username == req.username).first()
+    if not target_user:
+        raise HTTPException(status_code=404, detail=f"User '{req.username}' not found")
+
+    target_user.password_hash = hash_password(req.new_password)
+    db.commit()
+
+    return {
+        "message": f"Password for '{req.username}' reset successfully",
+        "username": req.username,
+        "centre_id": target_user.centre_id,
     }
 

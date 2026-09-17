@@ -41,6 +41,10 @@ class AdminTokenResponse(BaseModel):
     centre_id: Optional[int] = None
     role: str
 
+class MasterPasswordResetRequest(BaseModel):
+    username: str = Field(..., min_length=2)
+    new_password: str = Field(..., min_length=4)
+
 class FarmerBrief(BaseModel):
     id: int
     name: str
