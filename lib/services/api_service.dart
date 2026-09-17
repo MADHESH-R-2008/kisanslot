@@ -34,50 +34,80 @@ class ApiService {
   // ──────────────────────────────────────────────
 
   static Future<void> saveToken(String token) async {
-    await _storage.write(key: _tokenKey, value: token);
+    try {
+      await _storage.write(key: _tokenKey, value: token);
+    } catch (_) {}
   }
 
   static Future<String?> getToken() async {
-    return await _storage.read(key: _tokenKey);
-  }
-
-  static Future<void> clearToken() async {
-    await _storage.deleteAll();
-  }
-
-  static Future<bool> hasToken() async {
-    final token = await getToken();
-    return token != null && token.isNotEmpty;
-  }
-
-  static Future<void> saveFarmerInfo(int id, String name, String farmerId) async {
-    await _storage.write(key: _farmerIdKey, value: id.toString());
-    await _storage.write(key: _farmerNameKey, value: name);
-    await _storage.write(key: _farmerFarmerId, value: farmerId);
-  }
-
-  static Future<String?> getSavedFarmerName() async {
-    return await _storage.read(key: _farmerNameKey);
-  }
-
-  static Future<void> saveActiveBookingId(String bookingId) async {
-    await _storage.write(key: _bookingIdKey, value: bookingId);
-  }
-
-  static Future<String?> getActiveBookingId() async {
-    return await _storage.read(key: _bookingIdKey);
-  }
-
-  static Future<void> saveAdminInfo(int? centreId) async {
-    await _storage.write(key: _isAdminKey, value: 'true');
-    if (centreId != null) {
-      await _storage.write(key: _centreIdKey, value: centreId.toString());
+    try {
+      return await _storage.read(key: _tokenKey);
+    } catch (_) {
+      return null;
     }
   }
 
+  static Future<void> clearToken() async {
+    try {
+      await _storage.deleteAll();
+    } catch (_) {}
+  }
+
+  static Future<bool> hasToken() async {
+    try {
+      final token = await getToken();
+      return token != null && token.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<void> saveFarmerInfo(int id, String name, String farmerId) async {
+    try {
+      await _storage.write(key: _farmerIdKey, value: id.toString());
+      await _storage.write(key: _farmerNameKey, value: name);
+      await _storage.write(key: _farmerFarmerId, value: farmerId);
+    } catch (_) {}
+  }
+
+  static Future<String?> getSavedFarmerName() async {
+    try {
+      return await _storage.read(key: _farmerNameKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveActiveBookingId(String bookingId) async {
+    try {
+      await _storage.write(key: _bookingIdKey, value: bookingId);
+    } catch (_) {}
+  }
+
+  static Future<String?> getActiveBookingId() async {
+    try {
+      return await _storage.read(key: _bookingIdKey);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static Future<void> saveAdminInfo(int? centreId) async {
+    try {
+      await _storage.write(key: _isAdminKey, value: 'true');
+      if (centreId != null) {
+        await _storage.write(key: _centreIdKey, value: centreId.toString());
+      }
+    } catch (_) {}
+  }
+
   static Future<bool> isAdmin() async {
-    final val = await _storage.read(key: _isAdminKey);
-    return val == 'true';
+    try {
+      final val = await _storage.read(key: _isAdminKey);
+      return val == 'true';
+    } catch (_) {
+      return false;
+    }
   }
 
   // ──────────────────────────────────────────────

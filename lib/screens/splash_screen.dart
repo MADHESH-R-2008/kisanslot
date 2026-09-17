@@ -39,28 +39,28 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   }
 
   Future<void> _checkAuthAndNavigate() async {
-    // Wait for animation to play
-    await Future.delayed(const Duration(milliseconds: 2200));
+    await Future.delayed(const Duration(milliseconds: 1800));
     if (!mounted) return;
 
     try {
-      final hasToken = await ApiService.hasToken();
+      final hasToken = await ApiService.hasToken().timeout(
+        const Duration(seconds: 2),
+        onTimeout: () => false,
+      );
       if (hasToken) {
-        // Verify the token is still valid by calling profile
         try {
-          await ApiService.getProfile();
+          await ApiService.getProfile().timeout(
+            const Duration(seconds: 3),
+          );
           if (mounted) {
             Navigator.pushReplacementNamed(context, AppRoutes.home);
+            return;
           }
-          return;
         } catch (_) {
-          // Token expired or invalid, clear it
           await ApiService.clearToken();
         }
       }
-    } catch (_) {
-      // If any error, just go to login
-    }
+    } catch (_) {}
 
     if (mounted) {
       Navigator.pushReplacementNamed(context, AppRoutes.login);
