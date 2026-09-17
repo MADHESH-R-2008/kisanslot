@@ -73,6 +73,11 @@ def health_check():
 @app.get("/api/seed", tags=["System"])
 def seed_database():
     try:
+        from database import engine, ensure_schema_up_to_date
+        try:
+            ensure_schema_up_to_date(engine)
+        except Exception:
+            pass
         from seed import seed
         seed()
         return {"message": "Database seeded successfully! You can now log in."}
