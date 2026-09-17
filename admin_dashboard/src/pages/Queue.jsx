@@ -3,8 +3,6 @@ import { queueAPI, counterAPI } from '../services/api';
 import { useQueueSocket } from '../hooks/useQueueSocket';
 import { Megaphone, Play, CheckCircle, XCircle, Pause, PlayCircle, Wifi, WifiOff, SkipForward, Monitor, Clock, BarChart3, Users, Zap, AlertTriangle } from 'lucide-react';
 
-const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
-
 const statusColors = {
   WAITING:    { bg: '#fef3c7', color: '#92400e', label: 'Waiting' },
   CONFIRMED:  { bg: '#fef3c7', color: '#92400e', label: 'Confirmed' },
@@ -44,6 +42,7 @@ const counterStatusColors = {
 };
 
 const Queue = () => {
+  const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
   const [queueData, setQueueData] = useState({
     queue: [], waiting_count: 0, processing_count: 0,
     serving_count: 0, completed_count: 0, skipped_count: 0,

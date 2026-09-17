@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { queueAPI } from '../services/api';
 import { BarChart2, TrendingUp, Users, CheckCircle2, Clock, XCircle } from 'lucide-react';
 
-const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
-
 const StatCard = ({ icon: Icon, label, value, color, bg, sub }) => (
   <div className="card" style={{ padding: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
     <div style={{ width: 52, height: 52, borderRadius: 12, background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -18,6 +16,7 @@ const StatCard = ({ icon: Icon, label, value, color, bg, sub }) => (
 );
 
 const Reports = () => {
+  const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 

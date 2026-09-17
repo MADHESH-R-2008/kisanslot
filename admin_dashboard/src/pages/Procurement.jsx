@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { procurementAPI } from '../services/api';
 import { RefreshCw, Package } from 'lucide-react';
 
-const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
-
 const statusColors = {
   PENDING:       { bg: '#fef3c7', color: '#92400e' },
   QUALITY_CHECK: { bg: '#dbeafe', color: '#1e40af' },
@@ -66,6 +64,7 @@ const CompleteModal = ({ booking, onClose, onSave }) => {
 };
 
 const Procurement = () => {
+  const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState(null);

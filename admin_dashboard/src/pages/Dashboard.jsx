@@ -3,8 +3,6 @@ import { Users, Clock, CheckCircle, Activity, Building2, ArrowRight, SkipForward
 import { useNavigate } from 'react-router-dom';
 import { queueAPI } from '../services/api';
 
-const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
-
 const StatCard = ({ icon: Icon, label, value, color, bg, onClick }) => (
   <div
     className="card stat-card"
@@ -25,6 +23,7 @@ const StatCard = ({ icon: Icon, label, value, color, bg, onClick }) => (
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const centreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
   const [stats, setStats] = useState({
     waiting_count: 0, processing_count: 0, serving_count: 0,
     completed_count: 0, skipped_count: 0, cancelled_count: 0,
@@ -35,7 +34,8 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await queueAPI.getCentreStatus(centreId);
+      const currentCentreId = parseInt(localStorage.getItem('centre_id') || '1', 10);
+      const res = await queueAPI.getCentreStatus(currentCentreId);
       setStats(res.data);
     } catch (err) {
       console.error('Failed to fetch stats', err);
