@@ -197,17 +197,14 @@ class _CentreScreenState extends State<CentreScreen> {
                         const SizedBox(height: 16),
 
                         // Filter Chips
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: [
-                              _buildFilterChip('All'),
-                              const SizedBox(width: 8),
-                              _buildFilterChip('Nearest'),
-                              const SizedBox(width: 8),
-                              _buildFilterChip('Shortest Queue'),
-                            ],
-                          ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _buildFilterChip('All'),
+                            _buildFilterChip('Nearest'),
+                            _buildFilterChip('Shortest Queue'),
+                          ],
                         ),
                         // Location status banner
                         if (_locationStatus != null)
