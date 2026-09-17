@@ -289,24 +289,18 @@ class _CentreScreenState extends State<CentreScreen> {
                             ),
                           )
                         else
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: filteredCentres.length,
-                            itemBuilder: (context, index) {
-                              final centre = filteredCentres[index];
-                              return CentreCard(
-                                centre: centre,
-                                isSelected: _selectedCentreId == centre.id,
-                                onViewSlots: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.slotBooking,
-                                    arguments: centre,
-                                  );
-                                },
-                              );
-                            },
+                          ...filteredCentres.map(
+                            (centre) => CentreCard(
+                              centre: centre,
+                              isSelected: _selectedCentreId == centre.id,
+                              onViewSlots: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.slotBooking,
+                                  arguments: centre,
+                                );
+                              },
+                            ),
                           ),
                         const SizedBox(height: 16),
                       ],

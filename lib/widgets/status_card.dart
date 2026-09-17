@@ -63,12 +63,10 @@ class StatusTimelineCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          ListView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: steps.length,
-            itemBuilder: (context, index) {
-              final step = steps[index];
+          Column(
+            children: steps.asMap().entries.map((entry) {
+              final index = entry.key;
+              final step = entry.value;
               final isLast = index == steps.length - 1;
 
               return IntrinsicHeight(
@@ -146,7 +144,7 @@ class StatusTimelineCard extends StatelessWidget {
                   ],
                 ),
               );
-            },
+            }).toList(),
           ),
         ],
       ),

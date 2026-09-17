@@ -370,20 +370,20 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
                     ),
                   )
                 else
-                  GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 10,
-                      crossAxisSpacing: 10,
-                      childAspectRatio: 2.1,
-                    ),
-                    itemCount: _slots.length,
-                    itemBuilder: (context, index) {
-                      final slot = _slots[index];
-                      final isSelected = _selectedSlotId == slot.id;
-                      return _buildSlotCard(slot, isSelected: isSelected);
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final itemWidth = (constraints.maxWidth - 10) / 2;
+                      return Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: _slots.map((slot) {
+                          final isSelected = _selectedSlotId == slot.id;
+                          return SizedBox(
+                            width: itemWidth,
+                            child: _buildSlotCard(slot, isSelected: isSelected),
+                          );
+                        }).toList(),
+                      );
                     },
                   ),
                 const SizedBox(height: 24),
