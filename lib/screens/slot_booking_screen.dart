@@ -402,7 +402,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
                 // Crop Dropdown
                 _buildFieldLabel('Crop'),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCrop,
+                  value: _selectedCrop,
                   decoration: const InputDecoration(
                     prefixIcon: Icon(Icons.grass_rounded),
                   ),

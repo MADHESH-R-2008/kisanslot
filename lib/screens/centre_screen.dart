@@ -80,16 +80,21 @@ class _CentreScreenState extends State<CentreScreen> {
       }
 
       _centres = loaded;
-      if (mounted) setState(() => _isLoading = false);
-
-      _updateLocationAndDistances();
+      if (mounted) {
+        setState(() => _isLoading = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateLocationAndDistances();
+        });
+      }
     } on ApiException catch (_) {
       if (mounted) {
         setState(() {
           _centres = ProcurementCentre.getMockCentres();
           _isLoading = false;
         });
-        _updateLocationAndDistances();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateLocationAndDistances();
+        });
       }
     } catch (_) {
       if (mounted) {
@@ -97,7 +102,9 @@ class _CentreScreenState extends State<CentreScreen> {
           _centres = ProcurementCentre.getMockCentres();
           _isLoading = false;
         });
-        _updateLocationAndDistances();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateLocationAndDistances();
+        });
       }
     }
   }
