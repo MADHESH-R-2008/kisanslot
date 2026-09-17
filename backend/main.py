@@ -70,16 +70,25 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/migrate", tags=["System"])
+def migrate_database():
+    try:
+        from database import engine, ensure_schema_up_to_date
+        res = ensure_schema_up_to_date(engine)
+        return {"status": "Migration executed", "details": res}
+    except Exception as e:
+        import traceback
+        return {"error": f"Migration failed: {str(e)}", "traceback": traceback.format_exc()}
+
+
 @app.get("/api/seed", tags=["System"])
 def seed_database():
     try:
         from database import engine, ensure_schema_up_to_date
-        try:
-            ensure_schema_up_to_date(engine)
-        except Exception:
-            pass
+        migration_results = ensure_schema_up_to_date(engine)
         from seed import seed
         seed()
-        return {"message": "Database seeded successfully! You can now log in."}
+        return {"message": "Database seeded successfully! You can now log in.", "migration_results": migration_results}
     except Exception as e:
-        return {"error": f"Failed to seed database: {str(e)}"}
+        import traceback
+        return {"error": f"Failed to seed database: {str(e)}", "traceback": traceback.format_exc()}
