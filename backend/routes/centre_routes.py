@@ -1,4 +1,5 @@
 from typing import List, Optional
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
