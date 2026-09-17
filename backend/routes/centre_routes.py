@@ -178,24 +178,30 @@ def delete_centre(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Admin or Master deletion for centres."""
+    """Admin or Master deletion for a specific centre and all its associated data."""
     if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
     if not centre:
         raise HTTPException(status_code=404, detail="Centre not found")
-    if centre.bookings:
-        raise HTTPException(
-            status_code=409,
-            detail="This centre has booking history. Use Delete all centres to reset centre data.",
-        )
-    
-    # Clean up counters & slots before deleting centre
-    db.query(Counter).filter(Counter.centre_id == centre_id).delete(synchronize_session=False)
-    db.query(Slot).filter(Slot.centre_id == centre_id).delete(synchronize_session=False)
-    db.query(AdminUser).filter(AdminUser.centre_id == centre_id, AdminUser.role == RoleEnum.CENTRE_OPERATOR).delete(synchronize_session=False)
 
-    db.delete(centre)
-    db.commit()
-    return {"message": "Centre deleted"}
+    booking_ids = [b_id for (b_id,) in db.query(Booking.id).filter(Booking.centre_id == centre_id).all()]
+    try:
+        # FK-safe cascade delete for single centre
+        db.query(Counter).filter(Counter.centre_id == centre_id).delete(synchronize_session=False)
+        if booking_ids:
+            db.query(Payment).filter(Payment.booking_id.in_(booking_ids)).delete(synchronize_session=False)
+            db.query(Procurement).filter(Procurement.booking_id.in_(booking_ids)).delete(synchronize_session=False)
+            db.query(Booking).filter(Booking.centre_id == centre_id).delete(synchronize_session=False)
+        db.query(Slot).filter(Slot.centre_id == centre_id).delete(synchronize_session=False)
+        db.query(AdminUser).filter(AdminUser.centre_id == centre_id, AdminUser.role == RoleEnum.CENTRE_OPERATOR).delete(synchronize_session=False)
+        db.query(AdminUser).filter(AdminUser.centre_id == centre_id).update({AdminUser.centre_id: None}, synchronize_session=False)
+
+        db.delete(centre)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete centre: {str(e)}")
+
+    return {"message": "Centre and all associated data deleted successfully"}
