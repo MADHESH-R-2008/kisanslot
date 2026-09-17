@@ -45,6 +45,8 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE counters ADD current_booking_id INT",
         "ALTER TABLE counters ADD is_available BOOLEAN",
         "ALTER TABLE counters ADD is_deleted BOOLEAN",
+        "ALTER TABLE counters ADD created_at DATETIME",
+        "ALTER TABLE counters ADD updated_at DATETIME",
         "ALTER TABLE bookings ADD assigned_counter INT",
         "ALTER TABLE bookings ADD call_time DATETIME",
         "ALTER TABLE bookings ADD serving_at DATETIME",
@@ -52,6 +54,8 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE bookings ADD token_display VARCHAR(50)",
         "ALTER TABLE bookings ADD arrival_time DATETIME",
         "ALTER TABLE bookings ADD is_deleted BOOLEAN",
+        "ALTER TABLE bookings ADD created_at DATETIME",
+        "ALTER TABLE bookings ADD updated_at DATETIME",
         "ALTER TABLE admins ADD centre_id INT",
     ]
 
