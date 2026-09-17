@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/centre.dart';
@@ -5,7 +6,6 @@ import '../services/api_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/routes.dart';
 import '../widgets/centre_card.dart';
-import '../widgets/map_placeholder.dart';
 
 class CentreScreen extends StatefulWidget {
   const CentreScreen({super.key});
@@ -23,6 +23,7 @@ class _CentreScreenState extends State<CentreScreen> {
   String? _error;
   Position? _currentPosition;
   String? _locationStatus;
+  bool _gpsLoading = false;
 
   @override
   void initState() {
@@ -30,92 +31,60 @@ class _CentreScreenState extends State<CentreScreen> {
     _loadCentres();
   }
 
-  Future<Position?> _determinePosition() async {
+  // ─── GPS: runs FULLY async, never calls setState mid-frame ───────────────
+  Future<void> _updateLocationAndDistances() async {
+    if (!mounted || _gpsLoading) return;
+
+    // Use microtask to push off any possible in-frame execution
+    await Future.microtask(() => null);
+    if (!mounted) return;
+
+    _gpsLoading = true;
+
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        if (mounted) setState(() => _locationStatus = 'Location services disabled. Using default distances.');
-        return null;
+        _scheduleSetState(() => _locationStatus = 'Location services disabled.');
+        return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        // requestPermission() shows the SYSTEM dialog — the app loses focus,
+        // then regains it. We add a short delay AFTER the await so any
+        // in-progress frame caused by the app-resume has completed.
         permission = await Geolocator.requestPermission();
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!mounted) return;
+
         if (permission == LocationPermission.denied) {
-          if (mounted) setState(() => _locationStatus = 'Location permission denied. Using default distances.');
-          return null;
+          _scheduleSetState(() => _locationStatus = 'Location permission denied.');
+          return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        if (mounted) setState(() => _locationStatus = 'Location permission permanently denied.');
-        return null;
+        _scheduleSetState(() => _locationStatus = 'Location permission permanently denied.');
+        return;
       }
 
-      return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.medium,
-          timeLimit: Duration(seconds: 4),
-        ),
-      );
-    } catch (_) {
-      if (mounted) setState(() => _locationStatus = 'Could not fetch live GPS position.');
-      return null;
-    }
-  }
-
-  Future<void> _loadCentres() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-      _locationStatus = null;
-    });
-
-    try {
-      final data = await ApiService.getCentres();
-      List<ProcurementCentre> loaded = data.map((json) => ProcurementCentre.fromJson(json)).toList();
-
-      if (loaded.isEmpty) {
-        loaded = ProcurementCentre.getMockCentres();
+      Position position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.medium,
+            timeLimit: Duration(seconds: 5),
+          ),
+        );
+      } catch (_) {
+        _scheduleSetState(() => _locationStatus = 'GPS unavailable — using default distances.');
+        return;
       }
 
-      _centres = loaded;
-      if (mounted) {
-        setState(() => _isLoading = false);
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _updateLocationAndDistances();
-        });
-      }
-    } on ApiException catch (_) {
-      if (mounted) {
-        setState(() {
-          _centres = ProcurementCentre.getMockCentres();
-          _isLoading = false;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _updateLocationAndDistances();
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _centres = ProcurementCentre.getMockCentres();
-          _isLoading = false;
-        });
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _updateLocationAndDistances();
-        });
-      }
-    }
-  }
-
-  Future<void> _updateLocationAndDistances() async {
-    try {
-      Position? position = await _determinePosition();
-      if (position == null || !mounted) return;
+      if (!mounted) return;
 
       _currentPosition = position;
-      List<ProcurementCentre> updated = _centres.map((centre) {
+      final List<ProcurementCentre> updated = _centres.map((centre) {
         if (centre.latitude != null &&
             centre.longitude != null &&
             centre.latitude != 0.0 &&
@@ -139,30 +108,78 @@ class _CentreScreenState extends State<CentreScreen> {
         return centre;
       }).toList();
 
-      if (mounted) {
-        setState(() {
-          _centres = updated;
-          _locationStatus =
-              'GPS location acquired (${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)})';
+      _scheduleSetState(() {
+        _centres = updated;
+        _locationStatus =
+            'GPS: ${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)}';
+      });
+    } catch (_) {
+      _scheduleSetState(() => _locationStatus = 'GPS error — using default distances.');
+    } finally {
+      _gpsLoading = false;
+    }
+  }
+
+  /// Safely schedule a setState so it always runs AFTER the current frame.
+  void _scheduleSetState(VoidCallback fn) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(fn);
+    });
+  }
+
+  Future<void> _loadCentres() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+      _locationStatus = null;
+      _gpsLoading = false;
+    });
+
+    try {
+      final data = await ApiService.getCentres();
+      List<ProcurementCentre> loaded =
+          data.map((json) => ProcurementCentre.fromJson(json)).toList();
+
+      if (loaded.isEmpty) loaded = ProcurementCentre.getMockCentres();
+
+      if (!mounted) return;
+      setState(() {
+        _centres = loaded;
+        _isLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _centres = ProcurementCentre.getMockCentres();
+        _isLoading = false;
+      });
+    }
+
+    // Start GPS AFTER the frame that shows the centres completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateLocationAndDistances();
+    });
+  }
+
+  List<ProcurementCentre> get _filteredCentres {
+    final list = List<ProcurementCentre>.from(_centres);
+    try {
+      if (_selectedFilter == 'Nearest') {
+        list.sort((a, b) {
+          final ad = (a.distanceKm.isNaN || a.distanceKm.isInfinite) ? 9999.0 : a.distanceKm;
+          final bd = (b.distanceKm.isNaN || b.distanceKm.isInfinite) ? 9999.0 : b.distanceKm;
+          return ad.compareTo(bd);
         });
+      } else if (_selectedFilter == 'Shortest Queue') {
+        list.sort((a, b) => a.queueCount.compareTo(b.queueCount));
       }
     } catch (_) {}
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
-    List<ProcurementCentre> filteredCentres = List<ProcurementCentre>.from(_centres);
-    try {
-      if (_selectedFilter == 'Nearest') {
-        filteredCentres.sort((a, b) {
-          final aDist = (a.distanceKm.isNaN || a.distanceKm.isInfinite) ? 9999.0 : a.distanceKm;
-          final bDist = (b.distanceKm.isNaN || b.distanceKm.isInfinite) ? 9999.0 : b.distanceKm;
-          return aDist.compareTo(bDist);
-        });
-      } else if (_selectedFilter == 'Shortest Queue') {
-        filteredCentres.sort((a, b) => a.queueCount.compareTo(b.queueCount));
-      }
-    } catch (_) {}
+    final filteredCentres = _filteredCentres;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -180,154 +197,149 @@ class _CentreScreenState extends State<CentreScreen> {
                 children: [
                   CircularProgressIndicator(color: AppColors.primary),
                   SizedBox(height: 16),
-                  Text('Loading centres...', style: TextStyle(color: AppColors.textSecondary)),
+                  Text(
+                    'Loading centres...',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
                 ],
               ),
             )
-          : _error != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.cloud_off_rounded, size: 64, color: AppColors.textMuted),
-                        const SizedBox(height: 16),
-                        Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
-                        const SizedBox(height: 24),
-                        ElevatedButton.icon(
-                          onPressed: _loadCentres,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('TRY AGAIN'),
-                        ),
-                      ],
-                    ),
+          : RefreshIndicator(
+              onRefresh: _loadCentres,
+              color: AppColors.primary,
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                children: [
+                  // ── Location banner ─────────────────────────────────────
+                  _buildLocationBanner(),
+                  const SizedBox(height: 8),
+
+                  // ── Filter chips ─────────────────────────────────────────
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildFilterChip('All'),
+                      _buildFilterChip('Nearest'),
+                      _buildFilterChip('Shortest Queue'),
+                    ],
                   ),
-                )
-              : SafeArea(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top Map Placeholder
-                        MapPlaceholderWidget(
-                          centres: _centres,
-                          selectedCentreId: _selectedCentreId,
-                          onSelectCentre: (centre) {
-                            setState(() => _selectedCentreId = centre.id);
-                          },
-                        ),
-                        const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
-                        // Filter Chips
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _buildFilterChip('All'),
-                            _buildFilterChip('Nearest'),
-                            _buildFilterChip('Shortest Queue'),
-                          ],
-                        ),
-                        // Location status banner
-                        if (_locationStatus != null)
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _currentPosition != null ? Colors.green.shade50 : Colors.amber.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: _currentPosition != null ? Colors.green.shade200 : Colors.amber.shade200,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  _currentPosition != null ? Icons.my_location_rounded : Icons.location_off_rounded,
-                                  size: 16,
-                                  color: _currentPosition != null ? Colors.green.shade700 : Colors.amber.shade800,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    _locationStatus!,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: _currentPosition != null ? Colors.green.shade900 : Colors.amber.shade900,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                                GestureDetector(
-                                  onTap: _loadCentres,
-                                  child: Icon(
-                                    Icons.refresh_rounded,
-                                    size: 16,
-                                    color: _currentPosition != null ? Colors.green.shade700 : Colors.amber.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  // ── Count header ─────────────────────────────────────────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          'Available Centres (${filteredCentres.length})',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
                           ),
-
-                        // Subtitle
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                'Available Centres (${filteredCentres.length})',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              'Real-time Queue',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 12),
-
-                        // Centre Cards List
-                        if (filteredCentres.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(
-                              child: Text('No centres available.', style: TextStyle(color: AppColors.textSecondary)),
-                            ),
-                          )
-                        else
-                          ...filteredCentres.map(
-                            (centre) => CentreCard(
-                              centre: centre,
-                              isSelected: _selectedCentreId == centre.id,
-                              onViewSlots: () {
-                                Navigator.pushNamed(
-                                  context,
-                                  AppRoutes.slotBooking,
-                                  arguments: centre,
-                                );
-                              },
-                            ),
+                      ),
+                      if (_gpsLoading)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.primary,
                           ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
+                        )
+                      else
+                        const Text(
+                          'Real-time Queue',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                    ],
                   ),
-                ),
+                  const SizedBox(height: 12),
+
+                  // ── Centres list ─────────────────────────────────────────
+                  if (filteredCentres.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32),
+                      child: Center(
+                        child: Text(
+                          'No centres available.',
+                          style: TextStyle(color: AppColors.textSecondary),
+                        ),
+                      ),
+                    )
+                  else
+                    ...filteredCentres.map(
+                      (centre) => CentreCard(
+                        key: ValueKey(centre.id),
+                        centre: centre,
+                        isSelected: _selectedCentreId == centre.id,
+                        onViewSlots: () {
+                          Navigator.pushNamed(
+                            context,
+                            AppRoutes.slotBooking,
+                            arguments: centre,
+                          );
+                        },
+                      ),
+                    ),
+
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+    );
+  }
+
+  Widget _buildLocationBanner() {
+    if (_locationStatus == null && !_gpsLoading) return const SizedBox.shrink();
+
+    final bool hasGps = _currentPosition != null;
+    final Color bgColor = hasGps ? Colors.green.shade50 : Colors.amber.shade50;
+    final Color borderColor = hasGps ? Colors.green.shade200 : Colors.amber.shade200;
+    final Color iconColor = hasGps ? Colors.green.shade700 : Colors.amber.shade800;
+    final Color textColor = hasGps ? Colors.green.shade900 : Colors.amber.shade900;
+    final IconData iconData =
+        hasGps ? Icons.my_location_rounded : Icons.location_searching_rounded;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          if (_gpsLoading && _locationStatus == null)
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: iconColor),
+            )
+          else
+            Icon(iconData, size: 14, color: iconColor),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              _locationStatus ?? 'Getting GPS location...',
+              style: TextStyle(fontSize: 11, color: textColor, fontWeight: FontWeight.w500),
+            ),
+          ),
+          GestureDetector(
+            onTap: _loadCentres,
+            child: Icon(Icons.refresh_rounded, size: 14, color: iconColor),
+          ),
+        ],
+      ),
     );
   }
 
