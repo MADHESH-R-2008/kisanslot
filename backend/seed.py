@@ -30,11 +30,18 @@ def seed():
 
     try:
         # ─── Check if already seeded ─────────────────────────
-        existing_farmer = db.query(Farmer).filter(Farmer.mobile == "9999999999").first()
+        existing_farmer = (
+            db.query(Farmer)
+            .filter(
+                (Farmer.mobile == "9999999999")
+                | (Farmer.mobile == "9876543210")
+                | (Farmer.farmer_id == "FR10245")
+            )
+            .first()
+        )
         if existing_farmer:
             print("[INFO] Database already seeded. Verifying today's slots & demo queue.")
             print(f"   Test Farmer: {existing_farmer.name} ({existing_farmer.mobile})")
-            print(f"   Password: 123456")
 
             # Always ensure centres, today's slots and counters exist
             _ensure_centres(db)
@@ -46,53 +53,62 @@ def seed():
         print(" Seeding KisanSlot database...")
 
         # ─── Farmer ─────────────────────────────────────────
-        farmer = Farmer(
-            name="Ravi Kumar",
-            mobile="9999999999",
-            farmer_id="FR10245",
-            village="Example Village",
-            district="District 1",
-            state="State X",
-            crop="Paddy",
-            expected_quantity=850.0,
-            password_hash=hash_password("farmer123"),
-        )
-        db.add(farmer)
-        db.flush()  # Get the farmer.id
-        print(f"   ✅ Primary Test Farmer: {farmer.name} (Mobile: {farmer.mobile}, Password: farmer123)")
+        farmer = db.query(Farmer).filter((Farmer.mobile == "9999999999") | (Farmer.farmer_id == "FR10245")).first()
+        if not farmer:
+            farmer = Farmer(
+                name="Ravi Kumar",
+                mobile="9999999999",
+                farmer_id="FR10245",
+                village="Example Village",
+                district="District 1",
+                state="State X",
+                crop="Paddy",
+                expected_quantity=850.0,
+                password_hash=hash_password("farmer123"),
+            )
+            db.add(farmer)
+            db.flush()
+        print(f"   ✅ Primary Test Farmer: {farmer.name} (Mobile: {farmer.mobile})")
 
         # Secondary test farmer for backward compat if needed
-        farmer2 = Farmer(
-            name="Ravi Kumar (Alt)",
-            mobile="9876543210",
-            farmer_id="FR10246",
-            village="Example Village",
-            district="District 1",
-            state="State X",
-            crop="Paddy",
-            expected_quantity=500.0,
-            password_hash=hash_password("123456"),
-        )
-        db.add(farmer2)
+        farmer2 = db.query(Farmer).filter((Farmer.mobile == "9876543210") | (Farmer.farmer_id == "FR10246")).first()
+        if not farmer2:
+            farmer2 = Farmer(
+                name="Ravi Kumar (Alt)",
+                mobile="9876543210",
+                farmer_id="FR10246",
+                village="Example Village",
+                district="District 1",
+                state="State X",
+                crop="Paddy",
+                expected_quantity=500.0,
+                password_hash=hash_password("123456"),
+            )
+            db.add(farmer2)
+            db.flush()
 
         # ─── Additional test farmers for queue demo ──────────
         demo_farmers = []
         for i in range(1, 9):
-            f = Farmer(
-                name=f"Farmer Demo {i}",
-                mobile=f"900000000{i}",
-                farmer_id=f"FD{10000+i}",
-                village=f"Village {i}",
-                district="District 1",
-                state="State X",
-                crop=["Paddy", "Wheat", "Cotton", "Sugarcane", "Maize", "Rice", "Sorghum", "Groundnut"][i-1],
-                expected_quantity=100.0 * i,
-                password_hash=hash_password("demo123"),
-            )
-            db.add(f)
+            mob = f"900000000{i}"
+            fid = f"FD{10000+i}"
+            f = db.query(Farmer).filter((Farmer.mobile == mob) | (Farmer.farmer_id == fid)).first()
+            if not f:
+                f = Farmer(
+                    name=f"Farmer Demo {i}",
+                    mobile=mob,
+                    farmer_id=fid,
+                    village=f"Village {i}",
+                    district="District 1",
+                    state="State X",
+                    crop=["Paddy", "Wheat", "Cotton", "Sugarcane", "Maize", "Rice", "Sorghum", "Groundnut"][i-1],
+                    expected_quantity=100.0 * i,
+                    password_hash=hash_password("demo123"),
+                )
+                db.add(f)
+                db.flush()
             demo_farmers.append(f)
-        db.flush()
-        print(f"   ✅ Demo Farmers: {len(demo_farmers)} created (password: demo123)")
+        print(f"   ✅ Demo Farmers: {len(demo_farmers)} processed")
 
         # ─── Centres ────────────────────────────────────────
         centres = [
