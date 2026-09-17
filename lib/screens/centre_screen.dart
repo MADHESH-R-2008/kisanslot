@@ -31,40 +31,37 @@ class _CentreScreenState extends State<CentreScreen> {
     _loadCentres();
   }
 
-  // ─── GPS: runs FULLY async, never calls setState mid-frame ───────────────
+  // ─── GPS: NEVER calls requestPermission() ────────────────────────────────
+  // Permission is pre-requested by HomeScreen before navigation.
+  // CentreScreen only USES location if already granted — no system dialog,
+  // no GPU context destruction, no semantics crash on Oppo devices.
   Future<void> _updateLocationAndDistances() async {
     if (!mounted || _gpsLoading) return;
 
-    // Use microtask to push off any possible in-frame execution
+    // Push off any in-progress frame
     await Future.microtask(() => null);
     if (!mounted) return;
 
     _gpsLoading = true;
 
     try {
+      // Check permission — NEVER request it (no system dialog from here)
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _scheduleSetState(() => _locationStatus = 'Location services disabled.');
+        _scheduleSetState(() {
+          _gpsLoading = false;
+          _locationStatus = 'Location services off.';
+        });
         return;
       }
 
       LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        // requestPermission() shows the SYSTEM dialog — the app loses focus,
-        // then regains it. We add a short delay AFTER the await so any
-        // in-progress frame caused by the app-resume has completed.
-        permission = await Geolocator.requestPermission();
-        await Future.delayed(const Duration(milliseconds: 100));
-        if (!mounted) return;
-
-        if (permission == LocationPermission.denied) {
-          _scheduleSetState(() => _locationStatus = 'Location permission denied.');
-          return;
-        }
-      }
-
-      if (permission == LocationPermission.deniedForever) {
-        _scheduleSetState(() => _locationStatus = 'Location permission permanently denied.');
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        // Permission not granted yet — silently skip GPS
+        _scheduleSetState(() {
+          _gpsLoading = false;
+        });
         return;
       }
 
@@ -77,7 +74,10 @@ class _CentreScreenState extends State<CentreScreen> {
           ),
         );
       } catch (_) {
-        _scheduleSetState(() => _locationStatus = 'GPS unavailable — using default distances.');
+        _scheduleSetState(() {
+          _gpsLoading = false;
+          _locationStatus = 'GPS unavailable.';
+        });
         return;
       }
 
@@ -109,14 +109,15 @@ class _CentreScreenState extends State<CentreScreen> {
       }).toList();
 
       _scheduleSetState(() {
+        _gpsLoading = false;
         _centres = updated;
         _locationStatus =
             'GPS: ${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)}';
       });
     } catch (_) {
-      _scheduleSetState(() => _locationStatus = 'GPS error — using default distances.');
-    } finally {
-      _gpsLoading = false;
+      _scheduleSetState(() {
+        _gpsLoading = false;
+      });
     }
   }
 

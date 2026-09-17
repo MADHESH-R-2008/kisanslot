@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:geolocator/geolocator.dart';
 import 'dart:convert';
 import '../models/farmer.dart';
 import '../models/booking.dart';
@@ -140,12 +141,11 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         break;
       case 1:
-        Navigator.pushNamed(context, AppRoutes.centre).then((_) {
-          if (mounted) {
-            setState(() => _currentIndex = 0);
-            _loadData(); // Refresh on return
-          }
-        });
+        // Request GPS permission HERE (on HomeScreen) before navigating.
+        // On Oppo devices, the permission dialog destroys the GPU context.
+        // If this happens on HomeScreen (simple UI), the app resumes fine.
+        // If it happened on CentreScreen (complex rebuild), Flutter crashed.
+        _requestLocationThenNavigateToCentre();
         break;
       case 2:
         Navigator.pushNamed(context, AppRoutes.queue).then((_) {
@@ -161,6 +161,35 @@ class _HomeScreenState extends State<HomeScreen> {
         });
         break;
     }
+  }
+
+  /// Pre-requests GPS permission while HomeScreen is visible.
+  /// On Oppo/OnePlus, the system permission dialog destroys the GPU context.
+  /// By handling this on HomeScreen first, CentreScreen never triggers the dialog
+  /// and never suffers the GPU context destruction → no semantics crash.
+  Future<void> _requestLocationThenNavigateToCentre() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (serviceEnabled) {
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          // This triggers the system dialog — on HomeScreen, not CentreScreen
+          await Geolocator.requestPermission();
+          // Give the GPU context time to fully restore after the dialog
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+      }
+    } catch (_) {
+      // Permission errors are non-fatal — CentreScreen will just skip GPS
+    }
+
+    if (!mounted) return;
+    Navigator.pushNamed(context, AppRoutes.centre).then((_) {
+      if (mounted) {
+        setState(() => _currentIndex = 0);
+        _loadData();
+      }
+    });
   }
 
   @override
