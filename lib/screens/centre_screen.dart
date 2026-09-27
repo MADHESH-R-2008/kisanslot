@@ -18,13 +18,13 @@ class _CentreScreenState extends State<CentreScreen> {
   int? _selectedCentreId;
 
   List<ProcurementCentre> _centres = [];
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadCentres(showLoading: false);
+    _loadCentres(showLoading: true);
   }
 
   Future<void> _loadCentres({bool showLoading = true}) async {
