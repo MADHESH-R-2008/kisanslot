@@ -100,7 +100,9 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           } catch (_) {}
           
-          _setupWebSocket(_activeBooking!.centreId);
+          if (_activeBooking != null) {
+            _setupWebSocket(_activeBooking!.centreId);
+          }
         } else {
           // No booking, close WS if open
           _channel?.sink.close();

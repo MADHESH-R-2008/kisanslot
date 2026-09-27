@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/centre.dart';
 import '../utils/app_colors.dart';
 import '../utils/map_launcher.dart';
-import 'custom_button.dart';
 
 class CentreCard extends StatelessWidget {
   final ProcurementCentre centre;
@@ -245,35 +244,51 @@ class CentreCard extends StatelessWidget {
                 // Action Buttons Row
                 Row(
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: () {
-                        MapLauncher.openGoogleMaps(
-                          mapUrl: centre.googleMapUrl,
-                          latitude: centre.latitude,
-                          longitude: centre.longitude,
-                          name: centre.name,
-                          address: centre.address,
-                          context: context,
-                        );
-                      },
-                      icon: const Icon(Icons.map_rounded, size: 16, color: AppColors.primary),
-                      label: const Text(
-                        'Directions',
-                        style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.primary),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    Expanded(
+                      flex: 4,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          MapLauncher.openGoogleMaps(
+                            mapUrl: centre.googleMapUrl,
+                            latitude: centre.latitude,
+                            longitude: centre.longitude,
+                            name: centre.name,
+                            address: centre.address,
+                            context: context,
+                          );
+                        },
+                        icon: const Icon(Icons.map_rounded, size: 16, color: AppColors.primary),
+                        label: const Text(
+                          'Directions',
+                          style: TextStyle(color: AppColors.primary, fontSize: 13, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
-                      child: CustomButton(
-                        text: 'View Slots',
-                        icon: Icons.calendar_month_outlined,
-                        variant: isRec ? ButtonVariant.secondary : ButtonVariant.primary,
+                      flex: 6,
+                      child: ElevatedButton.icon(
                         onPressed: onViewSlots,
+                        icon: const Icon(Icons.calendar_month_outlined, size: 16, color: Colors.white),
+                        label: const Text(
+                          'View Slots',
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isRec ? AppColors.secondary : AppColors.primary,
+                          elevation: 2,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
                     ),
                   ],
