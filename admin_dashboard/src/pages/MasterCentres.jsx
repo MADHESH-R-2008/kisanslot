@@ -217,8 +217,9 @@ const MasterCentres = () => {
       if (search.trim()) params.search = search.trim();
       if (statusFilter !== '') params.is_active = statusFilter === 'active';
       const res = await masterAPI.listCentres(params);
-      setCentres(res.data.items);
-      setTotal(res.data.total);
+      const items = res.data?.items || (Array.isArray(res.data) ? res.data : []);
+      setCentres(items);
+      setTotal(res.data?.total ?? items.length);
       setError('');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load centres');

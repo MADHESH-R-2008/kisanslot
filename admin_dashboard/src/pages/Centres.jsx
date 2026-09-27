@@ -244,7 +244,7 @@ const Centres = () => {
   const [slotModalCentre, setSlotModalCentre] = useState(null);
   const role = localStorage.getItem('role');
   const assignedCentreId = Number(localStorage.getItem('centre_id'));
-  const canCreateCentres = role === 'ADMIN' || role === 'SUPER_ADMIN';
+  const canCreateCentres = ['ADMIN', 'SUPER_ADMIN', 'MASTER'].includes(role);
   const isSuperAdmin = role === 'SUPER_ADMIN';
 
   const fetchCentres = async () => {
@@ -291,9 +291,12 @@ const Centres = () => {
     }
   };
 
-  const visibleCentres = isSuperAdmin || role === 'ADMIN'
+  const districtId = Number(localStorage.getItem('district_id'));
+  const visibleCentres = ['ADMIN', 'SUPER_ADMIN'].includes(role)
     ? centres
-    : centres.filter(c => c.id === assignedCentreId);
+    : (role === 'MASTER'
+        ? centres.filter(c => c.district_id === districtId || c.district === localStorage.getItem('district_name') || !districtId)
+        : centres.filter(c => c.id === assignedCentreId));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
