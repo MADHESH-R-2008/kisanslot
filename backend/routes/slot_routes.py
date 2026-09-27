@@ -19,8 +19,23 @@ def _parse_time(t_str: str) -> time:
     raise ValueError(f"Invalid time format: {t_str}")
 
 
+def _format_time(t) -> str:
+    if t is None:
+        return "00:00"
+    if isinstance(t, str):
+        return t[:5]
+    if hasattr(t, "strftime"):
+        return t.strftime("%H:%M")
+    if hasattr(t, "total_seconds"):
+        total_seconds = int(t.total_seconds())
+        hours = (total_seconds // 3600) % 24
+        minutes = (total_seconds % 3600) // 60
+        return f"{hours:02d}:{minutes:02d}"
+    return str(t)[:5]
+
+
 def _build_slot_response(s: Slot) -> SlotResponse:
-    available = max(0, s.capacity - s.booked_count)
+    available = max(0, s.capacity - (s.booked_count or 0))
     if not s.is_active:
         slot_status = "CLOSED"
     elif available <= 0:
@@ -32,11 +47,11 @@ def _build_slot_response(s: Slot) -> SlotResponse:
         id=s.id,
         centre_id=s.centre_id,
         date=s.date,
-        start_time=s.start_time.strftime("%H:%M"),
-        end_time=s.end_time.strftime("%H:%M"),
+        start_time=_format_time(s.start_time),
+        end_time=_format_time(s.end_time),
         capacity=s.capacity,
         maximum_capacity=s.capacity,
-        booked_count=s.booked_count,
+        booked_count=s.booked_count or 0,
         available=available,
         status=slot_status,
         is_active=s.is_active and available > 0,
