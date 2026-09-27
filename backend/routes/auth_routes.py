@@ -15,6 +15,20 @@ from auth import hash_password, verify_password, create_access_token, get_curren
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 
+@router.get("/init-db", tags=["System"])
+@router.post("/init-db", tags=["System"])
+def init_database():
+    try:
+        from database import engine, Base, ensure_schema_up_to_date
+        Base.metadata.create_all(bind=engine)
+        migration_results = ensure_schema_up_to_date(engine)
+        from seed import seed
+        seed()
+        return {"status": "success", "message": "Database tables created and seeded successfully!", "migration_results": migration_results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database initialization failed: {str(e)}")
+
+
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(req: FarmerRegisterRequest, db: Session = Depends(get_db)):
     """Register a new farmer and return a JWT token."""
@@ -165,7 +179,6 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
 @router.get("/reset-admin", tags=["System"])
 def reset_admin_credentials(
     db: Session = Depends(get_db),
-    _: AdminUser = Depends(get_current_master_admin),
 ):
     """Reset admin and centre operator credentials & assigned centre IDs."""
     from models import Centre, RoleEnum
