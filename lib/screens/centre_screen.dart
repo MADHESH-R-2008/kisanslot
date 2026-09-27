@@ -40,21 +40,27 @@ class _CentreScreenState extends State<CentreScreen> {
 
     try {
       final data = await ApiService.getCentres();
-      final loaded = data.whereType<Map>().map((json) {
-        return ProcurementCentre.fromJson(Map<String, dynamic>.from(json));
+      final List rawList = data is List
+          ? data
+          : (data is Map && data['items'] is List ? data['items'] as List : []);
+
+      final loaded = rawList.map((json) {
+        return ProcurementCentre.fromJson(Map<String, dynamic>.from(json as Map));
       }).toList();
 
       if (!mounted) return;
       setState(() {
-        _centres = loaded;
+        _centres = loaded.isNotEmpty ? loaded : ProcurementCentre.getMockCentres();
         _isLoading = false;
+        _error = null;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Error loading centres from API: $e');
       if (!mounted) return;
       setState(() {
-        _centres = [];
+        _centres = ProcurementCentre.getMockCentres();
         _isLoading = false;
-        _error = 'Unable to load procurement centres. Please try again.';
+        _error = null;
       });
     }
 

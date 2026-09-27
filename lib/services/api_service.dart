@@ -272,7 +272,7 @@ class ApiService {
   // ──────────────────────────────────────────────
 
   /// Get all active procurement centres with optional location-based distance.
-  static Future<List<dynamic>> getCentres({double? lat, double? lon}) async {
+  static Future<dynamic> getCentres({double? lat, double? lon}) async {
     String url = '$baseUrl/api/centres';
     if (lat != null && lon != null) {
       url += '?lat=$lat&lon=$lon';
