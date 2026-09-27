@@ -36,7 +36,11 @@ const Login = () => {
 
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Login failed. Please check credentials.');
+      if (!err.response) {
+        setError('Cannot connect to backend server. Please check network connection or backend status.');
+      } else {
+        setError(err.response?.data?.detail || 'Login failed. Please check credentials.');
+      }
     } finally {
       setLoading(false);
     }

@@ -81,6 +81,19 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
+@app.get("/api/init-db", tags=["System"])
+@app.post("/api/init-db", tags=["System"])
+def init_database():
+    try:
+        from database import engine, Base, ensure_schema_up_to_date
+        Base.metadata.create_all(bind=engine)
+        migration_results = ensure_schema_up_to_date(engine)
+        from seed import seed
+        seed()
+        return {"status": "success", "message": "Database tables created and seeded successfully!", "migration_results": migration_results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database initialization failed: {str(e)}")
+
 @app.post("/api/migrate", tags=["System"])
 def migrate_database(_: AdminUser = Depends(get_current_master_admin)):
     try:
