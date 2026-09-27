@@ -81,14 +81,15 @@ def get_current_admin(
         admin_id: Optional[int] = payload.get("sub")
         role: Optional[str] = payload.get("role")
         token_centre_id: Optional[int] = payload.get("centre_id")
-        if admin_id is None or role not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN", "admin"]:
+        if admin_id is None or role not in ["CENTRE_OPERATOR", "ADMIN", "MASTER", "SUPER_ADMIN", "admin"]:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     admin = db.query(AdminUser).filter(AdminUser.id == int(admin_id)).first()
     stored_role = admin.role.value if admin is not None and hasattr(admin.role, "value") else getattr(admin, "role", None)
-    if admin is None or not admin.is_active or stored_role != role or admin.centre_id != token_centre_id:
+    token_district_id: Optional[int] = payload.get("district_id")
+    if admin is None or not admin.is_active or stored_role != role or admin.centre_id != token_centre_id or admin.district_id != token_district_id:
         raise credentials_exception
 
     return admin

@@ -123,7 +123,7 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {['ADMIN', 'SUPER_ADMIN'].includes(role) && (
+        {['ADMIN', 'SUPER_ADMIN', 'MASTER'].includes(role) && (
           <div className="card" style={{ padding: '1.5rem' }}>
             <h3 style={{ margin: '0 0 0.5rem' }}>Centres</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', margin: '0 0 1.25rem' }}>

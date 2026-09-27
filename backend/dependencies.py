@@ -21,7 +21,8 @@ def decode_jwt(token: str):
         user_id: int = int(payload.get("sub"))
         role: str = payload.get("role")
         centre_id = payload.get("centre_id")
-        return {"user_id": user_id, "role": role, "centre_id": centre_id}
+        district_id = payload.get("district_id")
+        return {"user_id": user_id, "role": role, "centre_id": centre_id, "district_id": district_id}
     except (JWTError, TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
@@ -53,13 +54,13 @@ async def get_current_farmer(user: dict = Depends(get_current_user), db: Session
 
 async def get_current_admin(user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
     """Validate that the JWT belongs to an admin/operator and return the ORM instance."""
-    if user["role"] not in [RoleEnum.CENTRE_OPERATOR.value, RoleEnum.ADMIN.value, RoleEnum.SUPER_ADMIN.value]:
+    if user["role"] not in [RoleEnum.CENTRE_OPERATOR.value, RoleEnum.ADMIN.value, RoleEnum.MASTER.value, RoleEnum.SUPER_ADMIN.value]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     admin = db.query(AdminUser).filter(AdminUser.id == user["user_id"]).first()
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin user not found")
     stored_role = admin.role.value if hasattr(admin.role, "value") else admin.role
-    if not admin.is_active or stored_role != user["role"] or admin.centre_id != user.get("centre_id"):
+    if not admin.is_active or stored_role != user["role"] or admin.centre_id != user.get("centre_id") or admin.district_id != user.get("district_id"):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token claims no longer match this account")
     return admin
 
@@ -76,3 +77,15 @@ async def enforce_operator_centre(centre_id: int, user: dict = Depends(get_curre
 def require_admin_or_super():
     """Dependency that permits ADMIN, CENTRE_OPERATOR, or SUPER_ADMIN roles."""
     return require_role([RoleEnum.ADMIN, RoleEnum.CENTRE_OPERATOR, RoleEnum.SUPER_ADMIN])
+
+
+def require_super_admin():
+    return require_role([RoleEnum.SUPER_ADMIN])
+
+
+def require_master():
+    return require_role([RoleEnum.MASTER])
+
+
+def require_centre_operator():
+    return require_role([RoleEnum.CENTRE_OPERATOR])

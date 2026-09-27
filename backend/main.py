@@ -15,6 +15,7 @@ from routes import (
     notification_routes,
     counter_routes,
     admin_routes,
+    master_routes,
 )
 
 from database import engine, Base, ensure_schema_up_to_date
@@ -62,6 +63,8 @@ app.include_router(ws_routes.router)
 app.include_router(notification_routes.router)
 app.include_router(counter_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(master_routes.master_router)
+app.include_router(master_routes.super_router)
 
 
 @app.get("/", tags=["Health"])

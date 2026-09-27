@@ -42,7 +42,7 @@ def test_farmer_cannot_access_other_booking_or_payment(client):
 
 
 def test_operator_centre_scope_and_admin_access(client):
-    operator = auth_header(1, "CENTRE_OPERATOR", 3)
+    operator = auth_header(1, "CENTRE_OPERATOR", 3, 3)
     assert client.get("/api/queue/centre/3/status", headers=operator).status_code == 200
     assert client.get("/api/queue/centre/1/status", headers=operator).status_code == 403
     assert client.get("/api/queue/centre/2/status", headers=operator).status_code == 403
@@ -70,7 +70,7 @@ def test_farmer_notification_isolation(client):
 def test_management_lists_and_farmer_history_are_scoped(client):
     _booking_for(1, "KS-HISTORY", 1)
     admin = auth_header(2, "ADMIN")
-    operator = auth_header(1, "CENTRE_OPERATOR", 3)
+    operator = auth_header(1, "CENTRE_OPERATOR", 3, 3)
     assert client.get("/api/admin/farmers/1/history", headers=admin).status_code == 200
     assert client.get("/api/admin/payments", headers=operator).status_code == 200
     assert client.get("/api/admin/procurements", headers=operator).status_code == 200

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
+import { masterAPI } from '../services/masterApi';
 
 const Login = () => {
   const [username, setUsername] = useState('admin');
@@ -16,11 +17,23 @@ const Login = () => {
     
     try {
       const response = await authAPI.login(username, password);
-      const { access_token, role, centre_id } = response.data;
+      const { access_token, role, centre_id, district_id } = response.data;
       localStorage.setItem('token', access_token);
       localStorage.setItem('role', role);
       localStorage.setItem('username', username);
       if (centre_id) localStorage.setItem('centre_id', String(centre_id));
+      if (district_id) localStorage.setItem('district_id', String(district_id));
+
+      // Fetch district name for MASTER role
+      if (role === 'MASTER') {
+        try {
+          const profileRes = await masterAPI.profile();
+          if (profileRes.data?.district) {
+            localStorage.setItem('district_name', profileRes.data.district);
+          }
+        } catch { /* non-critical */ }
+      }
+
       navigate('/');
     } catch (err) {
       setError(err.response?.data?.detail || 'Login failed. Please check credentials.');

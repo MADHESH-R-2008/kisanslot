@@ -17,7 +17,7 @@ def _workflow_booking(reference="KS-FLOW", token=1):
 
 def test_queue_procurement_payment_state_machines(client):
     _workflow_booking()
-    operator = auth_header(1, "CENTRE_OPERATOR", 3)
+    operator = auth_header(1, "CENTRE_OPERATOR", 3, 3)
 
     called = client.post("/api/queue/centres/3/next", headers=operator)
     assert called.status_code == 200 and called.json()["status"] == "CALLED"

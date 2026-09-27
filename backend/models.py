@@ -30,6 +30,7 @@ class RoleEnum(str, enum.Enum):
     FARMER = "FARMER"
     CENTRE_OPERATOR = "CENTRE_OPERATOR"
     ADMIN = "ADMIN"
+    MASTER = "MASTER"
     SUPER_ADMIN = "SUPER_ADMIN"
 
 class ProcurementStatusEnum(str, enum.Enum):
@@ -71,12 +72,25 @@ class Farmer(Base):
 # Procurement Centre
 # ──────────────────────────────────────────────
 
+class District(Base):
+    __tablename__ = "districts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False, unique=True)
+    code = Column(String(30), nullable=False, unique=True)
+    state = Column(String(255), nullable=False)
+    status = Column(String(20), nullable=False, default="ACTIVE")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
 class Centre(Base):
     __tablename__ = "centres"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     name = Column(String(255), nullable=False)
     code = Column(String(20), nullable=False, unique=True)
+    district_id = Column(Integer, ForeignKey("districts.id"), nullable=True, index=True)
     address = Column(Text, nullable=False)
     district = Column(String(255), nullable=False)
     state = Column(String(255), nullable=False)
@@ -102,6 +116,7 @@ class Centre(Base):
     # ──────────────────────────────────────────────
     counters = relationship("Counter", back_populates="centre", cascade="all, delete-orphan")
     bookings = relationship("Booking", back_populates="centre")
+    district_ref = relationship("District")
 
 # ──────────────────────────────────────────────
 # Slot
@@ -231,6 +246,8 @@ class AdminUser(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     # No changes needed here
     username = Column(String(50), unique=True, nullable=False, index=True)
+    full_name = Column(String(255), nullable=True)
+    mobile = Column(String(20), nullable=True, unique=True)
     password_hash = Column(String(255), nullable=False)
     role = Column(
         SAEnum(RoleEnum, values_callable=lambda e: [x.value for x in e]),
@@ -238,12 +255,36 @@ class AdminUser(Base):
         nullable=False,
     )
     centre_id = Column(Integer, ForeignKey("centres.id"), nullable=True) # Nullable for Master Admins
+    district_id = Column(Integer, ForeignKey("districts.id"), nullable=True, index=True)
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     centre = relationship("Centre")
+    district = relationship("District")
+
+
+class MasterProfile(Base):
+    __tablename__ = "masters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("admins.id"), nullable=False, unique=True)
+    district_id = Column(Integer, ForeignKey("districts.id"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class OperatorProfile(Base):
+    __tablename__ = "operators"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("admins.id"), nullable=False, unique=True)
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False, index=True)
+    status = Column(String(20), nullable=False, default="ACTIVE")
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class NotificationTypeEnum(str, enum.Enum):
     BOOKING_CONFIRMED = "BOOKING_CONFIRMED"
@@ -300,6 +341,8 @@ class AuditLog(Base):
     action = Column(String(255), nullable=False)
     entity_type = Column(String(50), nullable=True)
     entity_id = Column(String(50), nullable=True)
+    role = Column(String(30), nullable=True)
+    district_id = Column(Integer, ForeignKey("districts.id"), nullable=True)
     ip_address = Column(String(50), nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
 

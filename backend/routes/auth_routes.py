@@ -111,11 +111,13 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
         "user_id": admin.id,
         "role": role_str,
         "centre_id": admin.centre_id,
+        "district_id": admin.district_id,
     })
 
     return AdminTokenResponse(
         access_token=token,
         centre_id=admin.centre_id,
+        district_id=admin.district_id,
         role=role_str
     )
 
@@ -152,8 +154,9 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
             "user_id": admin.id,
             "role": role_str,
             "centre_id": admin.centre_id,
+            "district_id": admin.district_id,
         })
-        return AdminTokenResponse(access_token=token, centre_id=admin.centre_id, role=role_str)
+        return AdminTokenResponse(access_token=token, centre_id=admin.centre_id, district_id=admin.district_id, role=role_str)
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Provide either mobile (farmer) or username (admin) for login.")
 

@@ -2,11 +2,16 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarDays, BarChart2,
-  LogOut, CheckSquare, Building2, Menu, X, Bell, UserCog, WalletCards, Settings as SettingsIcon
+  LogOut, CheckSquare, Building2, Menu, X, Bell, UserCog, WalletCards, Settings as SettingsIcon,
+  Shield, MapPin
 } from 'lucide-react';
 import { notificationAPI } from './services/api';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import MasterDashboard from './pages/MasterDashboard';
+import MasterCentres from './pages/MasterCentres';
+import MasterOperators from './pages/MasterOperators';
+import Masters from './pages/Masters';
 import Queue from './pages/Queue';
 import Bookings from './pages/Bookings';
 import Procurement from './pages/Procurement';
@@ -35,6 +40,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const role = localStorage.getItem('role') || '';
+  const districtName = localStorage.getItem('district_name') || '';
 
   const handleLogout = () => {
     localStorage.clear();
@@ -42,30 +48,57 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   };
 
   // Role-based nav items
-  const navItems = [
-    { path: '/',            label: 'Dashboard',       icon: LayoutDashboard, roles: null },
-    { path: '/queue',       label: 'Queue',           icon: Users,           roles: null },
-    { path: '/bookings',    label: 'Bookings',        icon: CalendarDays,    roles: null },
-    { path: '/procurement', label: 'Procurement',     icon: CheckSquare,     roles: null },
-    { path: '/payments',    label: 'Payments',        icon: WalletCards,     roles: null },
-    { path: '/farmers',     label: 'Farmers',         icon: Users,           roles: null },
-    { path: '/notifications', label: 'Notifications', icon: Bell,            roles: null },
-    { path: '/reports',     label: 'Reports',         icon: BarChart2,       roles: null },
-    {
-      path: '/centres',
-      label: 'Centres',
-      icon: Building2,
-      roles: ['ADMIN', 'SUPER_ADMIN'],
-    },
-    { path: '/operators', label: 'Operators', icon: UserCog, roles: ['ADMIN', 'SUPER_ADMIN'] },
-    { path: '/settings', label: 'Settings', icon: SettingsIcon, roles: null },
-  ].filter((item) => !item.roles || item.roles.includes(role));
+  const navItems = [];
+
+  if (role === 'MASTER') {
+    // MASTER-specific sidebar
+    navItems.push(
+      { path: '/',                 label: 'Dashboard',    icon: LayoutDashboard },
+      { path: '/master/centres',   label: 'Centres',      icon: Building2 },
+      { path: '/master/operators', label: 'Operators',    icon: UserCog },
+      { path: '/bookings',         label: 'Bookings',     icon: CalendarDays },
+      { path: '/queue',            label: 'Queue',        icon: Users },
+      { path: '/procurement',      label: 'Procurement',  icon: CheckSquare },
+      { path: '/payments',         label: 'Payments',     icon: WalletCards },
+      { path: '/reports',          label: 'Reports',      icon: BarChart2 },
+      { path: '/notifications',    label: 'Notifications', icon: Bell },
+    );
+  } else {
+    // Default sidebar for ADMIN / SUPER_ADMIN / CENTRE_OPERATOR
+    navItems.push(
+      { path: '/',            label: 'Dashboard',       icon: LayoutDashboard },
+      { path: '/queue',       label: 'Queue',           icon: Users },
+      { path: '/bookings',    label: 'Bookings',        icon: CalendarDays },
+      { path: '/procurement', label: 'Procurement',     icon: CheckSquare },
+      { path: '/payments',    label: 'Payments',        icon: WalletCards },
+      { path: '/farmers',     label: 'Farmers',         icon: Users },
+      { path: '/notifications', label: 'Notifications', icon: Bell },
+      { path: '/reports',     label: 'Reports',         icon: BarChart2 },
+    );
+
+    if (['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      navItems.push(
+        { path: '/centres',   label: 'Centres',   icon: Building2 },
+        { path: '/operators', label: 'Operators', icon: UserCog },
+      );
+    }
+
+    if (role === 'SUPER_ADMIN') {
+      navItems.push(
+        { path: '/masters', label: 'Masters', icon: Shield },
+      );
+    }
+
+    navItems.push(
+      { path: '/settings', label: 'Settings', icon: SettingsIcon },
+    );
+  }
 
   return (
     <div className="sidebar" style={{ width: collapsed ? 64 : 240, transition: 'width 0.25s ease', overflow: 'hidden' }}>
       <div className="sidebar-header" style={{ justifyContent: collapsed ? 'center' : 'flex-start' }}>
         <div style={{
-          width: 32, height: 32, backgroundColor: 'var(--primary-color)',
+          width: 32, height: 32, backgroundColor: role === 'MASTER' ? '#7c3aed' : 'var(--primary-color)',
           borderRadius: 8, display: 'flex', alignItems: 'center',
           justifyContent: 'center', color: 'white', fontWeight: 700, flexShrink: 0,
         }}>K</div>
@@ -77,6 +110,18 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
           {collapsed ? <Menu size={18} /> : <X size={18} />}
         </button>
       </div>
+
+      {/* MASTER district indicator */}
+      {role === 'MASTER' && !collapsed && (
+        <div style={{
+          margin: '0 0.75rem 0.5rem', padding: '0.5rem 0.75rem',
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.12), rgba(37,99,235,0.08))',
+          borderRadius: 8, display: 'flex', alignItems: 'center', gap: '0.4rem',
+          fontSize: '0.78rem', fontWeight: 600, color: '#7c3aed',
+        }}>
+          <MapPin size={14} /> {districtName || 'District'}
+        </div>
+      )}
 
       <div className="sidebar-nav">
         {navItems.map((item) => (
@@ -100,7 +145,7 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
             <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.15rem' }}>
               {localStorage.getItem('username') || 'Admin'}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--primary-color)', marginTop: '0.1rem' }}>{role}</div>
+            <div style={{ fontSize: '0.75rem', color: role === 'MASTER' ? '#7c3aed' : 'var(--primary-color)', marginTop: '0.1rem' }}>{role}</div>
           </div>
         )}
         <div
@@ -286,6 +331,8 @@ const Layout = ({ children }) => {
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const role = localStorage.getItem('role') || '';
+  const districtName = localStorage.getItem('district_name') || '';
 
   useEffect(() => {
     if (isDark) {
@@ -309,6 +356,9 @@ const Layout = ({ children }) => {
     '/payments': 'Payments',
     '/notifications': 'Notifications',
     '/settings': 'Settings',
+    '/masters': 'Master Management',
+    '/master/centres': 'Centre Management',
+    '/master/operators': 'Operator Management',
   }[location.pathname] || 'KisanSlot';
 
   return (
@@ -316,7 +366,19 @@ const Layout = ({ children }) => {
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
       <div className="main-content">
         <div className="topbar">
-          <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 600 }}>{pageTitle}</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <h2 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 600 }}>{pageTitle}</h2>
+            {role === 'MASTER' && districtName && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                padding: '0.25rem 0.75rem', borderRadius: 50,
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.1), rgba(37,99,235,0.08))',
+                color: '#7c3aed', fontSize: '0.78rem', fontWeight: 600,
+              }}>
+                <MapPin size={13} /> {districtName}
+              </span>
+            )}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <NotificationMenu />
             <button
@@ -328,7 +390,9 @@ const Layout = ({ children }) => {
             </button>
             <div style={{
               width: 36, height: 36, borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--primary-color), #3b82f6)',
+              background: role === 'MASTER'
+                ? 'linear-gradient(135deg, #7c3aed, #2563eb)'
+                : 'linear-gradient(135deg, var(--primary-color), #3b82f6)',
               color: 'white', display: 'flex', alignItems: 'center',
               justifyContent: 'center', fontWeight: 700, fontSize: '0.9rem',
             }}>
@@ -344,13 +408,20 @@ const Layout = ({ children }) => {
   );
 };
 
+// ── Smart Dashboard Router ────────────────────────────────────────────────────
+const SmartDashboard = () => {
+  const role = localStorage.getItem('role') || '';
+  if (role === 'MASTER') return <MasterDashboard />;
+  return <Dashboard />;
+};
+
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<PrivateRoute><Layout><Dashboard /></Layout></PrivateRoute>} />
+        <Route path="/" element={<PrivateRoute><Layout><SmartDashboard /></Layout></PrivateRoute>} />
         <Route path="/queue" element={<PrivateRoute><Layout><Queue /></Layout></PrivateRoute>} />
         <Route path="/bookings" element={<PrivateRoute><Layout><Bookings /></Layout></PrivateRoute>} />
         <Route path="/procurement" element={<PrivateRoute><Layout><Procurement /></Layout></PrivateRoute>} />
@@ -359,15 +430,38 @@ function App() {
         <Route path="/notifications" element={<PrivateRoute><Layout><Notifications /></Layout></PrivateRoute>} />
         <Route path="/settings" element={<PrivateRoute><Layout><Settings /></Layout></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Layout><Reports /></Layout></PrivateRoute>} />
-        <Route
-          path="/centres"
-          element={
-            <PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
-              <Layout><Centres /></Layout>
-            </PrivateRoute>
-          }
-        />
-        <Route path="/operators" element={<PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}><Layout><Operators /></Layout></PrivateRoute>} />
+
+        {/* MASTER routes */}
+        <Route path="/master/centres" element={
+          <PrivateRoute requiredRoles={['MASTER']}>
+            <Layout><MasterCentres /></Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/master/operators" element={
+          <PrivateRoute requiredRoles={['MASTER']}>
+            <Layout><MasterOperators /></Layout>
+          </PrivateRoute>
+        } />
+
+        {/* ADMIN/SUPER_ADMIN routes */}
+        <Route path="/centres" element={
+          <PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+            <Layout><Centres /></Layout>
+          </PrivateRoute>
+        } />
+        <Route path="/operators" element={
+          <PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+            <Layout><Operators /></Layout>
+          </PrivateRoute>
+        } />
+
+        {/* SUPER_ADMIN master management */}
+        <Route path="/masters" element={
+          <PrivateRoute requiredRoles={['SUPER_ADMIN']}>
+            <Layout><Masters /></Layout>
+          </PrivateRoute>
+        } />
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

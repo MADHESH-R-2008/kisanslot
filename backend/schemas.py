@@ -39,6 +39,7 @@ class AdminTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     centre_id: Optional[int] = None
+    district_id: Optional[int] = None
     role: str
 
 class MasterPasswordResetRequest(BaseModel):
@@ -399,4 +400,3 @@ class NotificationPreferenceUpdate(BaseModel):
     procurement_notifications: Optional[bool] = None
     payment_notifications: Optional[bool] = None
     system_notifications: Optional[bool] = None
-

@@ -18,6 +18,7 @@ from database import SessionLocal, engine, Base
 from models import (
     Farmer, Centre, Slot, Booking, Procurement, Payment, AdminUser, Counter, Notification,
     BookingStatusEnum, ProcurementStatusEnum, PaymentStatusEnum, CounterStatusEnum, RoleEnum,
+    District, MasterProfile, OperatorProfile,
 )
 from auth import hash_password
 
@@ -48,6 +49,8 @@ def seed():
             _ensure_today_slots(db)
             _ensure_counters(db)
             _ensure_queue_demo_data(db, existing_farmer)
+            _ensure_district_access(db)
+            db.commit()
             return
 
         print(" Seeding KisanSlot database...")
@@ -299,6 +302,7 @@ def seed():
         # ─── Queue Demo Data for Centre C ────────────────────
         _create_queue_demo_bookings(db, centres[2], demo_farmers)
 
+        _ensure_district_access(db)
         db.commit()
 
         print()
@@ -634,6 +638,42 @@ def _create_queue_demo_bookings(db, centre_c, demo_farmers):
 
     db.flush()
     print(f"   ✅ Queue Demo: {len(statuses)} bookings created for Centre C (today)")
+
+
+def _ensure_district_access(db):
+    districts = {}
+    for index in range(1, 4):
+        code = f"DIST-{index}"
+        district = db.query(District).filter(District.code == code).first()
+        if not district:
+            district = District(name=f"District {index}", code=code, state="State X", status="ACTIVE")
+            db.add(district)
+            db.flush()
+        districts[index] = district
+
+    for centre in db.query(Centre).all():
+        number = 2 if centre.district and centre.district.endswith("2") else 3 if centre.district and centre.district.endswith("3") else 1
+        centre.district_id = districts[number].id
+
+    master = db.query(AdminUser).filter(AdminUser.username == "master1").first()
+    if not master:
+        master = AdminUser(full_name="District 1 Master", username="master1", mobile="9888888888",
+                           password_hash=hash_password("master123"), role=RoleEnum.MASTER,
+                           district_id=districts[1].id, centre_id=None, is_active=True)
+        db.add(master)
+        db.flush()
+    else:
+        master.role = RoleEnum.MASTER
+        master.district_id = districts[1].id
+    if not db.query(MasterProfile).filter(MasterProfile.user_id == master.id).first():
+        db.add(MasterProfile(user_id=master.id, district_id=districts[1].id))
+
+    for operator in db.query(AdminUser).filter(AdminUser.role == RoleEnum.CENTRE_OPERATOR, AdminUser.centre_id.isnot(None)).all():
+        centre = db.query(Centre).filter(Centre.id == operator.centre_id).first()
+        if centre:
+            operator.district_id = centre.district_id
+            if not db.query(OperatorProfile).filter(OperatorProfile.user_id == operator.id).first():
+                db.add(OperatorProfile(user_id=operator.id, centre_id=centre.id, status="ACTIVE" if operator.is_active else "INACTIVE"))
 
 
 if __name__ == "__main__":
