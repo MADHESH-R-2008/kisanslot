@@ -22,7 +22,7 @@ def decode_jwt(token: str):
         role: str = payload.get("role")
         centre_id = payload.get("centre_id")
         return {"user_id": user_id, "role": role, "centre_id": centre_id}
-    except JWTError:
+    except (JWTError, TypeError, ValueError):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Could not validate credentials")
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
@@ -58,6 +58,9 @@ async def get_current_admin(user: dict = Depends(get_current_user), db: Session 
     admin = db.query(AdminUser).filter(AdminUser.id == user["user_id"]).first()
     if not admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Admin user not found")
+    stored_role = admin.role.value if hasattr(admin.role, "value") else admin.role
+    if not admin.is_active or stored_role != user["role"] or admin.centre_id != user.get("centre_id"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token claims no longer match this account")
     return admin
 
 async def enforce_operator_centre(centre_id: int, user: dict = Depends(get_current_user)):

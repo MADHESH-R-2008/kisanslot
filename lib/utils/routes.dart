@@ -43,14 +43,24 @@ class AppRoutes {
       case home:
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case centre:
-        return MaterialPageRoute(builder: (_) => const CentreScreen());
+        return PageRouteBuilder(
+          pageBuilder: (_, _, _) => const CentreScreen(),
+          transitionDuration: Duration.zero,
+          reverseTransitionDuration: Duration.zero,
+        );
       case slotBooking:
         final centre = settings.arguments as ProcurementCentre?;
+        if (centre == null) {
+          return MaterialPageRoute(builder: (_) => const Scaffold(body: Center(child: Text('Select a procurement centre first.'))));
+        }
         return MaterialPageRoute(
           builder: (_) => SlotBookingScreen(selectedCentre: centre),
         );
       case confirmation:
         final booking = settings.arguments as BookingModel?;
+        if (booking == null) {
+          return MaterialPageRoute(builder: (_) => const Scaffold(body: Center(child: Text('Booking details are unavailable.'))));
+        }
         return MaterialPageRoute(
           builder: (_) => BookingConfirmationScreen(booking: booking),
         );

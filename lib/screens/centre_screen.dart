@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import '../models/centre.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -19,129 +18,31 @@ class _CentreScreenState extends State<CentreScreen> {
   int? _selectedCentreId;
 
   List<ProcurementCentre> _centres = [];
-  bool _isLoading = true;
+  bool _isLoading = false;
   String? _error;
-  Position? _currentPosition;
-  String? _locationStatus;
-  bool _gpsLoading = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCentres();
+    _loadCentres(showLoading: false);
   }
 
-  // ─── GPS: NEVER calls requestPermission() ────────────────────────────────
-  // Permission is pre-requested by HomeScreen before navigation.
-  // CentreScreen only USES location if already granted — no system dialog,
-  // no GPU context destruction, no semantics crash on Oppo devices.
-  Future<void> _updateLocationAndDistances() async {
-    if (!mounted || _gpsLoading) return;
-
-    // Push off any in-progress frame
-    await Future.microtask(() => null);
-    if (!mounted) return;
-
-    _gpsLoading = true;
-
-    try {
-      // Check permission — NEVER request it (no system dialog from here)
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-      if (!serviceEnabled) {
-        _scheduleSetState(() {
-          _gpsLoading = false;
-          _locationStatus = 'Location services off.';
-        });
-        return;
-      }
-
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
-        // Permission not granted yet — silently skip GPS
-        _scheduleSetState(() {
-          _gpsLoading = false;
-        });
-        return;
-      }
-
-      Position position;
-      try {
-        position = await Geolocator.getCurrentPosition(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 5),
-          ),
-        );
-      } catch (_) {
-        _scheduleSetState(() {
-          _gpsLoading = false;
-          _locationStatus = 'GPS unavailable.';
-        });
-        return;
-      }
-
-      if (!mounted) return;
-
-      _currentPosition = position;
-      final List<ProcurementCentre> updated = _centres.map((centre) {
-        if (centre.latitude != null &&
-            centre.longitude != null &&
-            centre.latitude != 0.0 &&
-            centre.longitude != 0.0) {
-          try {
-            double meters = Geolocator.distanceBetween(
-              position.latitude,
-              position.longitude,
-              centre.latitude!,
-              centre.longitude!,
-            );
-            if (meters.isNaN || meters.isInfinite) return centre;
-            double distKm = meters / 1000.0;
-            if (distKm.isNaN || distKm.isInfinite) return centre;
-            distKm = double.tryParse(distKm.toStringAsFixed(1)) ?? centre.distanceKm;
-            return centre.copyWithDistance(distKm);
-          } catch (_) {
-            return centre;
-          }
-        }
-        return centre;
-      }).toList();
-
-      _scheduleSetState(() {
-        _gpsLoading = false;
-        _centres = updated;
-        _locationStatus =
-            'GPS: ${position.latitude.toStringAsFixed(3)}, ${position.longitude.toStringAsFixed(3)}';
+  Future<void> _loadCentres({bool showLoading = true}) async {
+    if (showLoading && mounted) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
       });
-    } catch (_) {
-      _scheduleSetState(() {
-        _gpsLoading = false;
-      });
-    }
-  }
-
-  /// Safely schedule a setState so it always runs AFTER the current frame.
-  void _scheduleSetState(VoidCallback fn) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(fn);
-    });
-  }
-
-  Future<void> _loadCentres() async {
-    setState(() {
+    } else if (showLoading) {
       _isLoading = true;
       _error = null;
-      _locationStatus = null;
-      _gpsLoading = false;
-    });
+    }
 
     try {
       final data = await ApiService.getCentres();
-      List<ProcurementCentre> loaded =
-          data.map((json) => ProcurementCentre.fromJson(json)).toList();
-
-      if (loaded.isEmpty) loaded = ProcurementCentre.getMockCentres();
+      final loaded = data.whereType<Map>().map((json) {
+        return ProcurementCentre.fromJson(Map<String, dynamic>.from(json));
+      }).toList();
 
       if (!mounted) return;
       setState(() {
@@ -151,15 +52,12 @@ class _CentreScreenState extends State<CentreScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() {
-        _centres = ProcurementCentre.getMockCentres();
+        _centres = [];
         _isLoading = false;
+        _error = 'Unable to load procurement centres. Please try again.';
       });
     }
 
-    // Start GPS AFTER the frame that shows the centres completes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _updateLocationAndDistances();
-    });
   }
 
   List<ProcurementCentre> get _filteredCentres {
@@ -205,6 +103,8 @@ class _CentreScreenState extends State<CentreScreen> {
                 ],
               ),
             )
+            : _error != null
+            ? _buildErrorState()
           : RefreshIndicator(
               onRefresh: _loadCentres,
               color: AppColors.primary,
@@ -212,9 +112,6 @@ class _CentreScreenState extends State<CentreScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 children: [
                   // ── Location banner ─────────────────────────────────────
-                  _buildLocationBanner(),
-                  const SizedBox(height: 8),
-
                   // ── Filter chips ─────────────────────────────────────────
                   Wrap(
                     spacing: 8,
@@ -243,24 +140,14 @@ class _CentreScreenState extends State<CentreScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (_gpsLoading)
-                        const SizedBox(
-                          width: 14,
-                          height: 14,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: AppColors.primary,
-                          ),
-                        )
-                      else
-                        const Text(
-                          'Real-time Queue',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
+                      const Text(
+                        'Real-time Queue',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
                         ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -299,47 +186,31 @@ class _CentreScreenState extends State<CentreScreen> {
     );
   }
 
-  Widget _buildLocationBanner() {
-    if (_locationStatus == null && !_gpsLoading) return const SizedBox.shrink();
+  Widget _buildErrorState() {
+    final error = _error;
+    if (error == null) return const SizedBox.shrink();
 
-    final bool hasGps = _currentPosition != null;
-    final Color bgColor = hasGps ? Colors.green.shade50 : Colors.amber.shade50;
-    final Color borderColor = hasGps ? Colors.green.shade200 : Colors.amber.shade200;
-    final Color iconColor = hasGps ? Colors.green.shade700 : Colors.amber.shade800;
-    final Color textColor = hasGps ? Colors.green.shade900 : Colors.amber.shade900;
-    final IconData iconData =
-        hasGps ? Icons.my_location_rounded : Icons.location_searching_rounded;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: borderColor),
-      ),
-      child: Row(
-        children: [
-          if (_gpsLoading && _locationStatus == null)
-            SizedBox(
-              width: 14,
-              height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: iconColor),
-            )
-          else
-            Icon(iconData, size: 14, color: iconColor),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              _locationStatus ?? 'Getting GPS location...',
-              style: TextStyle(fontSize: 11, color: textColor, fontWeight: FontWeight.w500),
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_rounded, size: 52, color: AppColors.textMuted),
+            const SizedBox(height: 12),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
             ),
-          ),
-          GestureDetector(
-            onTap: _loadCentres,
-            child: Icon(Icons.refresh_rounded, size: 14, color: iconColor),
-          ),
-        ],
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _loadCentres,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('TRY AGAIN'),
+            ),
+          ],
+        ),
       ),
     );
   }

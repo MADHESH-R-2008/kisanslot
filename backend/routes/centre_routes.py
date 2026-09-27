@@ -2,6 +2,7 @@ from typing import List, Optional
 from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -12,6 +13,10 @@ from models import AdminUser, Booking, Centre, Counter, Payment, Procurement, Ro
 from schemas import CentreCreateRequest, CentreResponse, CentreUpdateRequest
 
 router = APIRouter(prefix="/api/centres", tags=["Centres"])
+
+
+class CentreStatusRequest(BaseModel):
+    is_active: bool
 
 
 import math
@@ -93,9 +98,40 @@ def list_centres(
             }
             res.append(c_dict)
         return res
-    except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=f"Centre list error: {str(e)} | Trace: {traceback.format_exc()}")
+    except Exception:
+        raise HTTPException(status_code=500, detail="Unable to load procurement centres")
+
+
+@router.get("/{centre_id}", response_model=CentreResponse)
+def get_centre(
+    centre_id: int,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if admin.role == RoleEnum.CENTRE_OPERATOR and admin.centre_id != centre_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this centre.")
+    centre = db.query(Centre).filter(Centre.id == centre_id).first()
+    if not centre:
+        raise HTTPException(status_code=404, detail="Centre not found.")
+    return centre
+
+
+@router.put("/{centre_id}/status", response_model=CentreResponse)
+def set_centre_status(
+    centre_id: int,
+    payload: CentreStatusRequest,
+    admin: AdminUser = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+):
+    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Administrator access required.")
+    centre = db.query(Centre).filter(Centre.id == centre_id).first()
+    if not centre:
+        raise HTTPException(status_code=404, detail="Centre not found.")
+    centre.is_active = payload.is_active
+    db.commit()
+    db.refresh(centre)
+    return centre
 
 
 @router.post("", response_model=CentreResponse, status_code=status.HTTP_201_CREATED)
@@ -211,37 +247,13 @@ def delete_all_centres(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Master-only destructive reset of all centres and their centre-owned data."""
+    """Deprecated compatibility endpoint: deactivate centres without deleting history."""
     if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
-    centre_ids = [centre_id for (centre_id,) in db.query(Centre.id).all()]
-    if not centre_ids:
-        return {"message": "No centres to delete", "deleted_centres": 0}
-
-    booking_ids = [booking_id for (booking_id,) in db.query(Booking.id).filter(Booking.centre_id.in_(centre_ids)).all()]
-    try:
-        # Remove dependants in foreign-key-safe order.
-        db.query(Counter).filter(Counter.centre_id.in_(centre_ids)).delete(synchronize_session=False)
-        if booking_ids:
-            db.query(Payment).filter(Payment.booking_id.in_(booking_ids)).delete(synchronize_session=False)
-            db.query(Procurement).filter(Procurement.booking_id.in_(booking_ids)).delete(synchronize_session=False)
-            db.query(Booking).filter(Booking.id.in_(booking_ids)).delete(synchronize_session=False)
-        db.query(Slot).filter(Slot.centre_id.in_(centre_ids)).delete(synchronize_session=False)
-        db.query(AdminUser).filter(
-            AdminUser.centre_id.in_(centre_ids),
-            AdminUser.role == RoleEnum.CENTRE_OPERATOR,
-        ).delete(synchronize_session=False)
-        db.query(AdminUser).filter(AdminUser.centre_id.in_(centre_ids)).update(
-            {AdminUser.centre_id: None}, synchronize_session=False,
-        )
-        deleted_centres = db.query(Centre).filter(Centre.id.in_(centre_ids)).delete(synchronize_session=False)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Could not delete all centres")
-
-    return {"message": "All centres and their operator accounts were deleted", "deleted_centres": deleted_centres}
+    affected = db.query(Centre).filter(Centre.is_active.is_(True)).update({Centre.is_active: False}, synchronize_session=False)
+    db.commit()
+    return {"message": "All centres deactivated; historical records preserved", "deactivated_centres": affected}
 
 
 @router.delete("/{centre_id}")
@@ -250,7 +262,7 @@ def delete_centre(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    """Admin or Master deletion for a specific centre and all its associated data."""
+    """Deprecated compatibility endpoint: deactivate a centre and preserve history."""
     if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
@@ -258,22 +270,6 @@ def delete_centre(
     if not centre:
         raise HTTPException(status_code=404, detail="Centre not found")
 
-    booking_ids = [b_id for (b_id,) in db.query(Booking.id).filter(Booking.centre_id == centre_id).all()]
-    try:
-        # FK-safe cascade delete for single centre
-        db.query(Counter).filter(Counter.centre_id == centre_id).delete(synchronize_session=False)
-        if booking_ids:
-            db.query(Payment).filter(Payment.booking_id.in_(booking_ids)).delete(synchronize_session=False)
-            db.query(Procurement).filter(Procurement.booking_id.in_(booking_ids)).delete(synchronize_session=False)
-            db.query(Booking).filter(Booking.centre_id == centre_id).delete(synchronize_session=False)
-        db.query(Slot).filter(Slot.centre_id == centre_id).delete(synchronize_session=False)
-        db.query(AdminUser).filter(AdminUser.centre_id == centre_id, AdminUser.role == RoleEnum.CENTRE_OPERATOR).delete(synchronize_session=False)
-        db.query(AdminUser).filter(AdminUser.centre_id == centre_id).update({AdminUser.centre_id: None}, synchronize_session=False)
-
-        db.delete(centre)
-        db.commit()
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to delete centre: {str(e)}")
-
-    return {"message": "Centre and all associated data deleted successfully"}
+    centre.is_active = False
+    db.commit()
+    return {"message": "Centre deactivated; historical records preserved", "centre_id": centre_id}

@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
+from datetime import date, datetime
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Farmer, Booking, Slot, Centre, BookingStatusEnum
 from schemas import BookingCreateRequest, BookingResponse, BookingDetailResponse
 from auth import get_current_farmer
-from services.booking_service import generate_booking_id, generate_token_number, format_token_display
+from services.booking_service import allocate_token_number, generate_booking_id, format_token_display
 from services.notification_service import create_notification
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
@@ -42,12 +45,22 @@ async def create_booking(
             detail="This slot does not belong to the selected centre.",
         )
 
-    # 4. Check slot capacity
-    if slot.booked_count >= slot.capacity:
+    if slot.date < date.today() or (slot.date == date.today() and slot.end_time <= datetime.now().time()):
+        raise HTTPException(status_code=400, detail="This slot has expired.")
+
+    # 4. Atomically reserve capacity. The conditional UPDATE prevents overbooking.
+    reserved = db.query(Slot).filter(
+        Slot.id == req.slot_id,
+        Slot.is_active.is_(True),
+        Slot.booked_count < Slot.capacity,
+    ).update({Slot.booked_count: Slot.booked_count + 1}, synchronize_session=False)
+    if reserved != 1:
+        db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Slot is already full. Please choose another time slot.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Slot is no longer available.",
         )
+    db.refresh(slot)
 
     # 5. Check for duplicate active booking (same farmer, same slot)
     existing = (
@@ -63,6 +76,7 @@ async def create_booking(
         .first()
     )
     if existing:
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You already have an active booking for this slot.",
@@ -70,7 +84,7 @@ async def create_booking(
 
     # 6. Generate booking ID and token number
     booking_id = generate_booking_id(db)
-    token_number = generate_token_number(db, req.slot_id, centre_id=req.centre_id)
+    token_number = allocate_token_number(db, req.centre_id, slot.date)
 
     # 7. Create booking
     booking = Booking(
@@ -78,6 +92,7 @@ async def create_booking(
         farmer_id=farmer.id,
         centre_id=req.centre_id,
         slot_id=req.slot_id,
+        booking_date=slot.date,
         crop=req.crop,
         expected_quantity=req.expected_quantity,
         vehicle_number=req.vehicle_number.upper(),
@@ -85,14 +100,9 @@ async def create_booking(
         status=BookingStatusEnum.CONFIRMED,
     )
     db.add(booking)
+    db.flush()
 
-    # 8. Increment booked count on the slot
-    slot.booked_count += 1
-
-    db.commit()
-    db.refresh(booking)
-
-    # 9. Auto-create procurement and payment records
+    # 8. Create dependent records in the same transaction.
     from models import Procurement, Payment, ProcurementStatusEnum, PaymentStatusEnum
 
     procurement = Procurement(
@@ -103,16 +113,13 @@ async def create_booking(
     )
     payment = Payment(
         booking_id=booking.id,
-        amount=req.expected_quantity * 21.50,
+        amount=None,
         status=PaymentStatusEnum.PENDING,
     )
     db.add(procurement)
     db.add(payment)
-    db.commit()
-
-    # 10. Send notification to farmer
+    token_display = format_token_display(req.centre_id, token_number)
     try:
-        token_display = format_token_display(req.centre_id, token_number)
         create_notification(
             db=db,
             user_id=farmer.id,
@@ -121,9 +128,16 @@ async def create_booking(
             message=f"Your slot at {centre.name} has been confirmed.\nToken: {token_display}",
             booking_id=booking.id,
             centre_id=centre.id,
+            commit=False,
         )
+        db.commit()
+        db.refresh(booking)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Booking conflict. Please try again.")
     except Exception:
-        pass
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Unable to complete booking.")
 
     # 11. Broadcast queue update via WebSocket
     try:
@@ -133,7 +147,7 @@ async def create_booking(
             "event": "BOOKING_CREATED",
             "centre_id": req.centre_id,
             "token": token_number,
-            "token_display": format_token_display(req.centre_id, token_number),
+            "token_display": token_display,
             "booking_id": booking.booking_id,
         }, req.centre_id)
     except Exception:

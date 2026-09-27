@@ -49,6 +49,8 @@ app.*.map.json
 
 # Backend (Python / FastAPI)
 backend/.env
+backend/backups/
+backups/
 backend/venv/
 backend/__pycache__/
 backend/**/__pycache__/

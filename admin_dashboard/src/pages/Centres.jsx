@@ -239,6 +239,7 @@ const CentreModal = ({ centre, onClose, onSave }) => {
 const Centres = () => {
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [modal, setModal] = useState(null); // null | 'create' | centre object
   const [slotModalCentre, setSlotModalCentre] = useState(null);
   const role = localStorage.getItem('role');
@@ -248,11 +249,13 @@ const Centres = () => {
 
   const fetchCentres = async () => {
     setLoading(true);
+    setError('');
     try {
       const res = await centreAPI.list();
-      setCentres(res.data);
+      setCentres(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Failed to load centres', err);
+      setError(err.response?.data?.detail || 'Unable to load procurement centres.');
     } finally {
       setLoading(false);
     }
@@ -313,6 +316,11 @@ const Centres = () => {
 
       {loading ? (
         <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>Loading centres...</div>
+      ) : error ? (
+        <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
+          <p>{error}</p>
+          <button className="btn btn-secondary" onClick={fetchCentres}>Try again</button>
+        </div>
       ) : visibleCentres.length === 0 ? (
         <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-secondary)' }}>
           No centres found. Click "Add Centre" to create one.

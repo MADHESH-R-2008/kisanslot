@@ -52,7 +52,8 @@ def get_current_farmer(
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         farmer_id: Optional[int] = payload.get("sub")
-        if farmer_id is None:
+        role: Optional[str] = payload.get("role")
+        if farmer_id is None or role != "FARMER":
             raise credentials_exception
     except JWTError:
         raise credentials_exception
@@ -79,13 +80,15 @@ def get_current_admin(
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         admin_id: Optional[int] = payload.get("sub")
         role: Optional[str] = payload.get("role")
+        token_centre_id: Optional[int] = payload.get("centre_id")
         if admin_id is None or role not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN", "admin"]:
             raise credentials_exception
     except JWTError:
         raise credentials_exception
 
     admin = db.query(AdminUser).filter(AdminUser.id == int(admin_id)).first()
-    if admin is None:
+    stored_role = admin.role.value if admin is not None and hasattr(admin.role, "value") else getattr(admin, "role", None)
+    if admin is None or not admin.is_active or stored_role != role or admin.centre_id != token_centre_id:
         raise credentials_exception
 
     return admin
@@ -100,4 +103,3 @@ def get_current_master_admin(
             detail="Requires Master Admin privileges."
         )
     return admin
-

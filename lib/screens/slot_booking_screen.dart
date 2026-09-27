@@ -10,11 +10,11 @@ import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
 
 class SlotBookingScreen extends StatefulWidget {
-  final ProcurementCentre? selectedCentre;
+  final ProcurementCentre selectedCentre;
 
   const SlotBookingScreen({
     super.key,
-    this.selectedCentre,
+    required this.selectedCentre,
   });
 
   @override
@@ -47,7 +47,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   @override
   void initState() {
     super.initState();
-    _centre = widget.selectedCentre ?? ProcurementCentre.getMockCentres()[1];
+    _centre = widget.selectedCentre;
     _selectedDate = DateTime.now();
     _selectedCrop = 'Paddy';
     _quantityController = TextEditingController(text: '850');
@@ -92,58 +92,60 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   }
 
   Future<void> _handleConfirmBooking() async {
-    if (_formKey.currentState!.validate()) {
-      if (_selectedSlotId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please select a time slot.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-        return;
-      }
+    final formState = _formKey.currentState;
+    if (formState == null || !formState.validate()) return;
 
-      setState(() => _isLoading = true);
+    final selectedSlotId = _selectedSlotId;
+    if (selectedSlotId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a time slot.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
 
-      try {
-        final data = await ApiService.createBooking(
-          centreId: _centre.id,
-          slotId: _selectedSlotId!,
-          crop: _selectedCrop,
-          expectedQuantity: double.tryParse(_quantityController.text.trim()) ?? 850.0,
-          vehicleNumber: _vehicleController.text.trim().toUpperCase(),
-        );
+    setState(() => _isLoading = true);
 
-        if (!mounted) return;
-        setState(() => _isLoading = false);
+    try {
+      final data = await ApiService.createBooking(
+        centreId: _centre.id,
+        slotId: selectedSlotId,
+        crop: _selectedCrop,
+        expectedQuantity: double.tryParse(_quantityController.text.trim()) ?? 850.0,
+        vehicleNumber: _vehicleController.text.trim().toUpperCase(),
+      );
 
-        final newBooking = BookingModel.fromCreateResponse(data);
+      if (!mounted) return;
+      setState(() => _isLoading = false);
 
-        Navigator.pushReplacementNamed(
-          context,
-          AppRoutes.confirmation,
-          arguments: newBooking,
-        );
-      } on ApiException catch (e) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message),
-            backgroundColor: AppColors.error,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Booking failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+      final newBooking = BookingModel.fromCreateResponse(data);
+
+      Navigator.pushReplacementNamed(
+        context,
+        AppRoutes.confirmation,
+        arguments: newBooking,
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.message),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Booking failed: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
     }
   }
 
@@ -162,7 +164,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
               onSurface: AppColors.textPrimary,
             ),
           ),
-          child: child!,
+          child: child ?? const SizedBox.shrink(),
         );
       },
     );

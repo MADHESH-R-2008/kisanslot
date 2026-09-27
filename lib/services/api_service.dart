@@ -280,7 +280,7 @@ class ApiService {
     final response = await http.get(
       Uri.parse(url),
       headers: await _authHeaders(),
-    );
+    ).timeout(const Duration(seconds: 15));
     return _handleResponse(response);
   }
 

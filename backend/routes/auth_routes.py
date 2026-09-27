@@ -10,7 +10,7 @@ from schemas import (
     FarmerRegisterRequest, FarmerLoginRequest, TokenResponse, FarmerBrief,
     AdminLoginRequest, AdminTokenResponse, MasterPasswordResetRequest
 )
-from auth import hash_password, verify_password, create_access_token
+from auth import hash_password, verify_password, create_access_token, get_current_master_admin
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
@@ -52,7 +52,7 @@ def register(req: FarmerRegisterRequest, db: Session = Depends(get_db)):
     db.refresh(farmer)
 
     # Generate JWT
-    token = create_access_token(data={"sub": str(farmer.id)})
+    token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
 
     return TokenResponse(
         access_token=token,
@@ -77,7 +77,7 @@ def login(req: FarmerLoginRequest, db: Session = Depends(get_db)):
             detail="Invalid password. Please try again.",
         )
 
-    token = create_access_token(data={"sub": str(farmer.id)})
+    token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
 
     return TokenResponse(
         access_token=token,
@@ -95,6 +95,8 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password.",
         )
+    if not admin.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive.")
 
     if not verify_password(req.password, admin.password_hash):
         raise HTTPException(
@@ -106,6 +108,7 @@ def admin_login(req: AdminLoginRequest, db: Session = Depends(get_db)):
     role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
     token = create_access_token(data={
         "sub": str(admin.id),
+        "user_id": admin.id,
         "role": role_str,
         "centre_id": admin.centre_id,
     })
@@ -132,18 +135,21 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No farmer account found with this mobile number.")
         if not verify_password(req.password, farmer.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for farmer account.")
-        token = create_access_token(data={"sub": str(farmer.id)})
+        token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
         return TokenResponse(access_token=token, farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id))
     elif req.username:
         clean_username = req.username.strip()
         admin = db.query(AdminUser).filter(func.lower(AdminUser.username) == func.lower(clean_username)).first()
         if not admin:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid admin username.")
+        if not admin.is_active:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This account is inactive.")
         if not verify_password(req.password, admin.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for admin account.")
         role_str = admin.role.value if hasattr(admin.role, 'value') else admin.role
         token = create_access_token(data={
             "sub": str(admin.id),
+            "user_id": admin.id,
             "role": role_str,
             "centre_id": admin.centre_id,
         })
@@ -154,7 +160,10 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
 
 @router.post("/reset-admin", tags=["System"])
 @router.get("/reset-admin", tags=["System"])
-def reset_admin_credentials(db: Session = Depends(get_db)):
+def reset_admin_credentials(
+    db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_master_admin),
+):
     """Reset admin and centre operator credentials & assigned centre IDs."""
     from models import Centre, RoleEnum
     centres = db.query(Centre).all()
@@ -210,6 +219,7 @@ def reset_admin_credentials(db: Session = Depends(get_db)):
 def master_reset_operator_password(
     req: MasterPasswordResetRequest,
     db: Session = Depends(get_db),
+    _: AdminUser = Depends(get_current_master_admin),
 ):
     """Master Admin endpoint to reset password for any operator or admin account."""
     clean_username = req.username.strip()

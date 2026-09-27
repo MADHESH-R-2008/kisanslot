@@ -1,27 +1,16 @@
 from datetime import date as date_type
+import secrets
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from models import Booking, Slot
+from sqlalchemy import func, text
+from models import Booking, Slot, TokenCounter
 
 
 def generate_booking_id(db: Session) -> str:
-    """Generate a unique booking ID like KS1001, KS1002, etc."""
-    last_booking = (
-        db.query(Booking)
-        .order_by(Booking.id.desc())
-        .first()
-    )
-
-    if last_booking and last_booking.booking_id.startswith("KS"):
-        try:
-            last_num = int(last_booking.booking_id[2:])
-            new_num = last_num + 1
-        except ValueError:
-            new_num = 1001
-    else:
-        new_num = 1001
-
-    return f"KS{new_num}"
+    """Generate an opaque booking reference without a read/increment race."""
+    while True:
+        candidate = f"KS{secrets.token_hex(5).upper()}"
+        if not db.query(Booking.id).filter(Booking.booking_id == candidate).first():
+            return candidate
 
 
 def generate_token_number(db: Session, slot_id: int, centre_id: int = None) -> int:
@@ -54,10 +43,65 @@ def generate_token_number(db: Session, slot_id: int, centre_id: int = None) -> i
     return max_token + 1
 
 
+def allocate_token_number(db: Session, centre_id: int, booking_date: date_type) -> int:
+    """Atomically allocate the next token for a centre/day.
+
+    PostgreSQL, MySQL, and SQLite use their native atomic upsert operation so
+    concurrent transactions cannot receive the same value.
+    """
+    dialect = db.get_bind().dialect.name
+    values = {"centre_id": centre_id, "booking_date": booking_date, "last_token": 1}
+
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+        statement = insert(TokenCounter).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=[TokenCounter.centre_id, TokenCounter.booking_date],
+            set_={"last_token": TokenCounter.last_token + 1},
+        ).returning(TokenCounter.last_token)
+        return int(db.execute(statement).scalar_one())
+
+    if dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
+        statement = insert(TokenCounter).values(**values)
+        statement = statement.on_conflict_do_update(
+            index_elements=[TokenCounter.centre_id, TokenCounter.booking_date],
+            set_={"last_token": TokenCounter.last_token + 1},
+        ).returning(TokenCounter.last_token)
+        return int(db.execute(statement).scalar_one())
+
+    if dialect in {"mysql", "mariadb"}:
+        # LAST_INSERT_ID(expr) is scoped to this connection. It returns 1 for
+        # the first allocation and the atomically incremented value thereafter.
+        db.execute(text(
+            "INSERT INTO token_counters "
+            "(centre_id, booking_date, last_token, updated_at) "
+            "VALUES (:centre_id, :booking_date, LAST_INSERT_ID(1), CURRENT_TIMESTAMP) "
+            "ON DUPLICATE KEY UPDATE "
+            "last_token = LAST_INSERT_ID(last_token + 1), "
+            "updated_at = CURRENT_TIMESTAMP"
+        ), {"centre_id": centre_id, "booking_date": booking_date})
+        return int(db.execute(text("SELECT LAST_INSERT_ID()")).scalar_one())
+
+    counter = (
+        db.query(TokenCounter)
+        .filter(TokenCounter.centre_id == centre_id, TokenCounter.booking_date == booking_date)
+        .with_for_update()
+        .first()
+    )
+    if counter is None:
+        counter = TokenCounter(**values)
+        db.add(counter)
+        db.flush()
+    else:
+        counter.last_token += 1
+        db.flush()
+    return counter.last_token
+
+
 def format_token_display(centre_id: int, token_number: int) -> str:
     """
     Format a token for display.
     Example: centre_id=3, token_number=6 → 'C3-006'
     """
     return f"C{centre_id}-{token_number:03d}"
-

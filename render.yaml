@@ -3,7 +3,7 @@ services:
     name: kisanslot-backend
     env: python
     rootDir: backend
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt && alembic -c ../alembic.ini upgrade head
     startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
@@ -17,6 +17,10 @@ services:
         value: "1440"
       - key: AVERAGE_PROCESSING_TIME_MINUTES
         value: "6"
+      - key: ENVIRONMENT
+        value: "production"
+      - key: CORS_ORIGINS
+        sync: false
 
   - type: static
     name: kisanslot-admin

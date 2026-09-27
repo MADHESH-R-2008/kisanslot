@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import engine, Base
@@ -14,16 +14,23 @@ from routes import (
     ws_routes,
     notification_routes,
     counter_routes,
+    admin_routes,
 )
 
 from database import engine, Base, ensure_schema_up_to_date
+from auth import get_current_master_admin
+from models import AdminUser
+from config import get_settings
 
-# Create all tables & auto-migrate missing columns on startup
-Base.metadata.create_all(bind=engine)
-try:
-    ensure_schema_up_to_date(engine)
-except Exception:
-    pass
+settings = get_settings()
+
+# Local compatibility only. Production schema changes are applied with Alembic.
+if settings.ENVIRONMENT.lower() == "development":
+    Base.metadata.create_all(bind=engine)
+    try:
+        ensure_schema_up_to_date(engine)
+    except Exception:
+        pass
 
 app = FastAPI(
     title="KisanSlot API",
@@ -36,7 +43,7 @@ app = FastAPI(
 # CORS configuration for Flutter development
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow Flutter dev on any local address
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,6 +61,7 @@ app.include_router(payment_routes.router)
 app.include_router(ws_routes.router)
 app.include_router(notification_routes.router)
 app.include_router(counter_routes.router)
+app.include_router(admin_routes.router)
 
 
 @app.get("/", tags=["Health"])
@@ -70,25 +78,23 @@ def root():
 def health_check():
     return {"status": "healthy"}
 
-@app.get("/api/migrate", tags=["System"])
-def migrate_database():
+@app.post("/api/migrate", tags=["System"])
+def migrate_database(_: AdminUser = Depends(get_current_master_admin)):
     try:
         from database import engine, ensure_schema_up_to_date
         res = ensure_schema_up_to_date(engine)
         return {"status": "Migration executed", "details": res}
-    except Exception as e:
-        import traceback
-        return {"error": f"Migration failed: {str(e)}", "traceback": traceback.format_exc()}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Database migration failed")
 
 
-@app.get("/api/seed", tags=["System"])
-def seed_database():
+@app.post("/api/seed", tags=["System"])
+def seed_database(_: AdminUser = Depends(get_current_master_admin)):
     try:
         from database import engine, ensure_schema_up_to_date
         migration_results = ensure_schema_up_to_date(engine)
         from seed import seed
         seed()
         return {"message": "Database seeded successfully! You can now log in.", "migration_results": migration_results}
-    except Exception as e:
-        import traceback
-        return {"error": f"Failed to seed database: {str(e)}", "traceback": traceback.format_exc()}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Database seed failed")

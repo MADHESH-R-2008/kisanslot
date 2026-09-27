@@ -61,10 +61,12 @@ export const slotAPI = {
 // ── Centres ───────────────────────────────────────────────────────────────────
 export const centreAPI = {
   list: () => api.get('/centres/'),
+  get: (id) => api.get(`/centres/${id}`),
   create: (data) => api.post('/centres/', data),
   update: (id, data) => api.put(`/centres/${id}`, data),
   remove: (id) => api.delete(`/centres/${id}`),
   removeAll: () => api.delete('/centres/'),
+  setStatus: (id, isActive) => api.put(`/centres/${id}/status`, { is_active: isActive }),
 };
 
 // ── Counters ──────────────────────────────────────────────────────────────────
@@ -79,14 +81,45 @@ export const counterAPI = {
 
 // ── Bookings ──────────────────────────────────────────────────────────────────
 export const bookingAPI = {
-  list: () => api.get('/bookings/admin/all'),
+  list: (params) => api.get('/admin/bookings', { params }),
+};
+
+export const operatorAPI = {
+  list: (params) => api.get('/admin/operators', { params }),
+  create: (data) => api.post('/admin/operators', data),
+  update: (id, data) => api.put(`/admin/operators/${id}`, data),
+  setStatus: (id, isActive) => api.put(`/admin/operators/${id}/status`, { is_active: isActive }),
+  assignCentre: (id, centreId) => api.put(`/admin/operators/${id}/centre`, { centre_id: centreId }),
+  get: (id) => api.get(`/admin/operators/${id}`),
+};
+
+export const farmerAPI = {
+  list: (params) => api.get('/admin/farmers', { params }),
+  get: (id) => api.get(`/admin/farmers/${id}`),
+  history: (id, params) => api.get(`/admin/farmers/${id}/history`, { params }),
+};
+
+export const analyticsAPI = {
+  overview: (centreId) => api.get('/admin/analytics/overview', { params: centreId ? { centre_id: centreId } : {} }),
+};
+
+export const paymentAPI = {
+  list: (params) => api.get('/admin/payments', { params }),
+  process: (bookingId) => api.post(`/payments/${bookingId}/process`),
+  complete: (bookingId, transactionId) => api.post(`/payments/${bookingId}/complete`, { transaction_id: transactionId }),
+  fail: (bookingId) => api.post(`/payments/${bookingId}/failed`, {}),
+};
+
+export const adminAPI = {
+  me: () => api.get('/admin/me'),
+  changePassword: (data) => api.put('/admin/me/password', data),
 };
 
 // ── Procurement ───────────────────────────────────────────────────────────────
 export const procurementAPI = {
-  list: (centreId) => api.get(`/procurement/centre/${centreId}`),
+  list: (params) => api.get('/admin/procurements', { params }),
   start: (bookingId) => api.post(`/procurement/${bookingId}/start`),
-  complete: (bookingId, data) => api.put(`/procurement/${bookingId}/complete`, data),
+  complete: (bookingId, data) => api.post(`/procurement/${bookingId}/complete`, data),
 };
 
 // ── Notifications ─────────────────────────────────────────────────────────────
@@ -95,6 +128,8 @@ export const notificationAPI = {
   getUnreadCount: () => api.get('/notifications/unread-count'),
   markRead: (id) => api.put(`/notifications/${id}/read`),
   markAllRead: () => api.put('/notifications/read-all'),
+  preferences: () => api.get('/notifications/preferences'),
+  updatePreferences: (data) => api.put('/notifications/preferences', data),
 };
 
 export default api;

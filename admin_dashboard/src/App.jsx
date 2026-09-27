@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, Users, CalendarDays, BarChart2,
-  LogOut, CheckSquare, Building2, Menu, X, Bell
+  LogOut, CheckSquare, Building2, Menu, X, Bell, UserCog, WalletCards, Settings as SettingsIcon
 } from 'lucide-react';
 import { notificationAPI } from './services/api';
 import Login from './pages/Login';
@@ -12,6 +12,11 @@ import Bookings from './pages/Bookings';
 import Procurement from './pages/Procurement';
 import Reports from './pages/Reports';
 import Centres from './pages/Centres';
+import Operators from './pages/Operators';
+import Farmers from './pages/Farmers';
+import Payments from './pages/Payments';
+import Notifications from './pages/Notifications';
+import Settings from './pages/Settings';
 import './index.css';
 
 // ── Auth guard ────────────────────────────────────────────────────────────────
@@ -42,6 +47,9 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
     { path: '/queue',       label: 'Queue',           icon: Users,           roles: null },
     { path: '/bookings',    label: 'Bookings',        icon: CalendarDays,    roles: null },
     { path: '/procurement', label: 'Procurement',     icon: CheckSquare,     roles: null },
+    { path: '/payments',    label: 'Payments',        icon: WalletCards,     roles: null },
+    { path: '/farmers',     label: 'Farmers',         icon: Users,           roles: null },
+    { path: '/notifications', label: 'Notifications', icon: Bell,            roles: null },
     { path: '/reports',     label: 'Reports',         icon: BarChart2,       roles: null },
     {
       path: '/centres',
@@ -49,6 +57,8 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       icon: Building2,
       roles: ['ADMIN', 'SUPER_ADMIN'],
     },
+    { path: '/operators', label: 'Operators', icon: UserCog, roles: ['ADMIN', 'SUPER_ADMIN'] },
+    { path: '/settings', label: 'Settings', icon: SettingsIcon, roles: null },
   ].filter((item) => !item.roles || item.roles.includes(role));
 
   return (
@@ -294,6 +304,11 @@ const Layout = ({ children }) => {
     '/procurement': 'Procurement',
     '/reports': 'Reports & Analytics',
     '/centres': 'Centres',
+    '/operators': 'Operators',
+    '/farmers': 'Farmers',
+    '/payments': 'Payments',
+    '/notifications': 'Notifications',
+    '/settings': 'Settings',
   }[location.pathname] || 'KisanSlot';
 
   return (
@@ -339,6 +354,10 @@ function App() {
         <Route path="/queue" element={<PrivateRoute><Layout><Queue /></Layout></PrivateRoute>} />
         <Route path="/bookings" element={<PrivateRoute><Layout><Bookings /></Layout></PrivateRoute>} />
         <Route path="/procurement" element={<PrivateRoute><Layout><Procurement /></Layout></PrivateRoute>} />
+        <Route path="/payments" element={<PrivateRoute><Layout><Payments /></Layout></PrivateRoute>} />
+        <Route path="/farmers" element={<PrivateRoute><Layout><Farmers /></Layout></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><Layout><Notifications /></Layout></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute><Layout><Settings /></Layout></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Layout><Reports /></Layout></PrivateRoute>} />
         <Route
           path="/centres"
@@ -348,6 +367,7 @@ function App() {
             </PrivateRoute>
           }
         />
+        <Route path="/operators" element={<PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}><Layout><Operators /></Layout></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

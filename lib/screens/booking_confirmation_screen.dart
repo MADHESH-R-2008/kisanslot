@@ -5,16 +5,16 @@ import '../utils/routes.dart';
 import '../widgets/custom_button.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
-  final BookingModel? booking;
+  final BookingModel booking;
 
   const BookingConfirmationScreen({
     super.key,
-    this.booking,
+    required this.booking,
   });
 
   @override
   Widget build(BuildContext context) {
-    final activeBooking = booking ?? BookingModel.mockBooking();
+    final activeBooking = booking;
 
 
     return Scaffold(

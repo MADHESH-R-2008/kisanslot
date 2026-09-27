@@ -10,10 +10,13 @@ class BaseNotificationProvider:
         raise NotImplementedError
 
 class InAppNotificationProvider(BaseNotificationProvider):
-    def send(self, db: Session, notification: Notification) -> bool:
+    def send(self, db: Session, notification: Notification, commit: bool = True) -> bool:
         db.add(notification)
-        db.commit()
-        db.refresh(notification)
+        if commit:
+            db.commit()
+            db.refresh(notification)
+        else:
+            db.flush()
         return True
 
 class FirebaseNotificationProvider(BaseNotificationProvider):
@@ -68,6 +71,7 @@ class NotificationService:
         message: str,
         booking_id: Optional[int] = None,
         centre_id: Optional[int] = None
+        , commit: bool = True
     ) -> Optional[Notification]:
         if user_id and not self.is_notification_enabled(db, user_id, notification_type):
             logger.info(f"Notification {notification_type} muted by user preferences for user_id={user_id}")
@@ -83,7 +87,7 @@ class NotificationService:
             is_read=False
         )
 
-        self.in_app_provider.send(db, notif)
+        self.in_app_provider.send(db, notif, commit=commit)
         self.firebase_provider.send(db, notif)
         return notif
 
@@ -97,7 +101,8 @@ def create_notification(
     title: str,
     message: str,
     booking_id: Optional[int] = None,
-    centre_id: Optional[int] = None
+    centre_id: Optional[int] = None,
+    commit: bool = True,
 ) -> Optional[Notification]:
     return notification_service.create_notification(
         db=db,
@@ -106,5 +111,6 @@ def create_notification(
         title=title,
         message=message,
         booking_id=booking_id,
-        centre_id=centre_id
+        centre_id=centre_id,
+        commit=commit,
     )

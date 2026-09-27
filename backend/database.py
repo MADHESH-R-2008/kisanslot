@@ -11,12 +11,17 @@ if db_url.startswith("sqlite:///./"):
     db_file = base_dir / db_url.replace("sqlite:///./", "")
     db_url = f"sqlite:///{db_file.as_posix()}"
 
-engine = create_engine(
-    db_url,
-    pool_pre_ping=True,
-    pool_recycle=3600,
-    echo=False,
-)
+engine_options = {
+    "pool_pre_ping": True,
+    "pool_recycle": 1800,
+    "echo": False,
+}
+if db_url.startswith("mysql+pymysql://"):
+    # utf8mb4 is required for full Unicode support. TLS, when required by the
+    # provider, can be supplied in DATABASE_URL (for example ?ssl_ca=...).
+    engine_options["connect_args"] = {"charset": "utf8mb4"}
+
+engine = create_engine(db_url, **engine_options)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -45,6 +50,7 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE centres ADD distance_km FLOAT",
         "ALTER TABLE centres ADD rating FLOAT",
         "ALTER TABLE centres ADD google_map_url TEXT",
+        "ALTER TABLE centres ADD updated_at DATETIME",
         "ALTER TABLE counters ADD current_booking_id INT",
         "ALTER TABLE counters ADD is_available BOOLEAN",
         "ALTER TABLE counters ADD is_deleted BOOLEAN",
@@ -59,10 +65,19 @@ def ensure_schema_up_to_date(bind_engine):
         "ALTER TABLE bookings ADD is_deleted BOOLEAN",
         "ALTER TABLE bookings ADD created_at DATETIME",
         "ALTER TABLE bookings ADD updated_at DATETIME",
+        "ALTER TABLE bookings ADD booking_date DATE",
         "ALTER TABLE admins ADD centre_id INT",
         "ALTER TABLE notifications ADD booking_id INT",
         "ALTER TABLE notifications ADD centre_id INT",
         "ALTER TABLE notifications ADD updated_at DATETIME",
+        "ALTER TABLE farmers ADD is_active BOOLEAN",
+        "ALTER TABLE procurement ADD rejected_quantity FLOAT",
+        "ALTER TABLE procurement ADD remarks TEXT",
+        "ALTER TABLE procurement ADD procurement_date DATETIME",
+        "ALTER TABLE payments ADD payment_method VARCHAR(30)",
+        "ALTER TABLE payments ADD failure_reason TEXT",
+        "ALTER TABLE payments ADD created_at DATETIME",
+        "ALTER TABLE payments ADD updated_at DATETIME",
     ]
 
     results = []
@@ -73,4 +88,13 @@ def ensure_schema_up_to_date(bind_engine):
             results.append(f"SUCCESS: {stmt}")
         except Exception as e:
             results.append(f"SKIPPED/EXISTS: {stmt} ({e})")
+    try:
+        with bind_engine.begin() as conn:
+            conn.execute(text(
+                "UPDATE bookings SET booking_date = "
+                "(SELECT slots.date FROM slots WHERE slots.id = bookings.slot_id) "
+                "WHERE booking_date IS NULL"
+            ))
+    except Exception as e:
+        results.append(f"SKIPPED booking_date backfill ({e})")
     return results

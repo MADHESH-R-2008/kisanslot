@@ -2,7 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from database import get_db
+from typing import Optional
+from datetime import date
+from fastapi import Query
 from models import Farmer
+from routes.admin_routes import _farmer_history
 from schemas import FarmerResponse, FarmerUpdateRequest
 from auth import get_current_farmer
 
@@ -38,3 +42,8 @@ def update_profile(
     db.commit()
     db.refresh(farmer)
     return farmer
+
+
+@router.get("/me/history")
+def my_history(page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100), date_from: Optional[date] = None, date_to: Optional[date] = None, status: Optional[str] = None, centre_id: Optional[int] = None, history_type: Optional[str] = None, farmer: Farmer = Depends(get_current_farmer), db: Session = Depends(get_db)):
+    return _farmer_history(db, farmer.id, centre_id, page, limit, date_from, date_to, status, history_type)

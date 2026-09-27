@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from typing import List, Optional
-from datetime import datetime
+from datetime import date, datetime, time
 
 from database import get_db
 from models import Notification, NotificationPreference, RoleEnum
@@ -53,6 +53,9 @@ def get_notifications(
     unread_only: bool = Query(False),
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    notification_type: Optional[str] = Query(None, alias="type"),
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
     user: dict = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -64,6 +67,12 @@ def get_notifications(
     unread_count = base_query.filter(Notification.is_read == False).count()
 
     filtered_query = base_query
+    if notification_type:
+        filtered_query = filtered_query.filter(Notification.type == notification_type.upper())
+    if date_from:
+        filtered_query = filtered_query.filter(Notification.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        filtered_query = filtered_query.filter(Notification.created_at <= datetime.combine(date_to, time.max))
     if unread_only:
         filtered_query = filtered_query.filter(Notification.is_read == False)
 

@@ -32,17 +32,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final profileData = await ApiService.getProfile();
       _farmer = FarmerModel.fromJson(profileData);
 
-      // Attempt to load active booking as a mock "history" since backend only returns active booking right now
-      // In a real app we would call a /bookings/history endpoint
-      try {
-        final bookingId = await ApiService.getActiveBookingId();
-        if (bookingId != null && bookingId.isNotEmpty) {
-          final bookingData = await ApiService.getBooking(bookingId);
-          _bookings = [BookingModel.fromJson(bookingData)];
-        }
-      } catch (_) {
-        _bookings = [];
-      }
+      final bookingData = await ApiService.getMyBookings();
+      _bookings = bookingData
+          .whereType<Map>()
+          .map((json) => BookingModel.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
 
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {

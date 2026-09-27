@@ -214,10 +214,14 @@ def delete_slot(
 
 
 @router.post("/centres/rollover", tags=["Admin"])
-def rollover_slots(db: Session = Depends(get_db)):
+def rollover_slots(
+    db: Session = Depends(get_db),
+    admin: AdminUser = Depends(get_current_admin),
+):
     """Close slots for past dates and open slots for the next 7 days for all active centres."""
     from datetime import date, timedelta, time
-    import traceback
+    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+        raise HTTPException(status_code=403, detail="Admin access required.")
 
     try:
         today = date.today()
@@ -269,7 +273,6 @@ def rollover_slots(db: Session = Depends(get_db)):
             "new_slots": new_slots_count,
             "centres": len(active_centres),
         }
-    except Exception as e:
+    except Exception:
         db.rollback()
-        return {"error": str(e), "type": type(e).__name__, "traceback": traceback.format_exc()}
-
+        raise HTTPException(status_code=500, detail="Slot rollover failed")

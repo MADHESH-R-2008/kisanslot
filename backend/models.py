@@ -2,7 +2,7 @@ import enum
 from datetime import datetime, date, time
 
 from sqlalchemy import (
-    Column, Integer, String, Float, Boolean, DateTime, Date, Time,
+    Column, Integer, String, Float, Numeric, Boolean, DateTime, Date, Time,
     ForeignKey, Enum as SAEnum, Text, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
@@ -61,6 +61,7 @@ class Farmer(Base):
     crop = Column(String(100), nullable=False)
     expected_quantity = Column(Float, nullable=False, default=0.0)
     password_hash = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
@@ -90,6 +91,7 @@ class Centre(Base):
     rating = Column(Float, default=4.5)
     google_map_url = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     __table_args__ = (UniqueConstraint("code", name="uq_centre_code"),)
 
     # Relationships
@@ -137,6 +139,7 @@ class Booking(Base):
     farmer_id = Column(Integer, ForeignKey("farmers.id"), nullable=False)
     centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False)
     slot_id = Column(Integer, ForeignKey("slots.id"), nullable=False)
+    booking_date = Column(Date, nullable=False, default=date.today, index=True)
     is_deleted = Column(Boolean, default=False)
     crop = Column(String(100), nullable=False)
     expected_quantity = Column(Float, nullable=False)
@@ -154,6 +157,10 @@ class Booking(Base):
     completed_at = Column(DateTime, nullable=True)  # Phase 3.2: when completed
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("centre_id", "booking_date", "token_number", name="uq_booking_centre_date_token"),
+    )
 
 
     # Relationships
@@ -173,9 +180,12 @@ class Procurement(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     booking_id = Column(Integer, ForeignKey("bookings.id"), unique=True, nullable=False)
     quality_status = Column(String(50), default="PENDING")
-    actual_weight = Column(Float, nullable=True)
-    rate = Column(Float, default=21.50)
-    total_amount = Column(Float, nullable=True)
+    actual_weight = Column(Numeric(12, 3), nullable=True)
+    rejected_quantity = Column(Numeric(12, 3), nullable=False, default=0)
+    rate = Column(Numeric(12, 2), default=21.50)
+    total_amount = Column(Numeric(14, 2), nullable=True)
+    remarks = Column(Text, nullable=True)
+    procurement_date = Column(DateTime, nullable=True)
     status = Column(
         SAEnum(ProcurementStatusEnum, values_callable=lambda e: [x.value for x in e]),
         default=ProcurementStatusEnum.PENDING,
@@ -195,14 +205,18 @@ class Payment(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     booking_id = Column(Integer, ForeignKey("bookings.id"), unique=True, nullable=False)
-    amount = Column(Float, nullable=True)
+    amount = Column(Numeric(14, 2), nullable=True)
     transaction_id = Column(String(100), nullable=True)
+    payment_method = Column(String(30), nullable=True)
+    failure_reason = Column(Text, nullable=True)
     status = Column(
         SAEnum(PaymentStatusEnum, values_callable=lambda e: [x.value for x in e]),
         default=PaymentStatusEnum.PENDING,
         nullable=False,
     )
     payment_date = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships
     booking = relationship("Booking", back_populates="payment")
@@ -315,3 +329,17 @@ class Counter(Base):
     centre = relationship("Centre", back_populates="counters")
     current_booking = relationship("Booking", foreign_keys=[current_booking_id])
 
+
+class TokenCounter(Base):
+    """Atomic per-centre/day token allocator used by booking transactions."""
+    __tablename__ = "token_counters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    centre_id = Column(Integer, ForeignKey("centres.id"), nullable=False, index=True)
+    booking_date = Column(Date, nullable=False, index=True)
+    last_token = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("centre_id", "booking_date", name="uq_token_counter_centre_date"),
+    )
