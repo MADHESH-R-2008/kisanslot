@@ -2,6 +2,8 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import date, datetime
 
+DateType = date
+
 
 # ──────────────────────────────────────────────
 # Auth Schemas
@@ -170,7 +172,10 @@ class SlotUpdateRequest(BaseModel):
 class SlotResponse(BaseModel):
     id: int
     centre_id: Optional[int] = None
-    date: Optional[date] = None
+    # Use an alias because the field itself is also named ``date``; without
+    # it Pydantic can resolve the annotation to the field default instead of
+    # datetime.date on recent Python/Pydantic versions.
+    date: Optional[DateType] = None
     start_time: str
     end_time: str
     capacity: int
