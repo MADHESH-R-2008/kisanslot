@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -63,6 +64,44 @@ class _PaymentScreenState extends State<PaymentScreen> {
       case 'COMPLETED': return 4;
       case 'FAILED': return 0;
       default: return 0;
+    }
+  }
+
+  Future<void> _downloadPdf(String type) async {
+    final bId = _booking?.bookingId ?? widget.bookingId;
+    if (bId == null || bId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Booking ID not available for PDF download.')),
+      );
+      return;
+    }
+
+    final url = '${ApiService.baseUrl}/api/bookings/$bId/pdf/$type';
+    final uri = Uri.parse(url);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        await launchUrl(uri, mode: LaunchMode.inAppWebView);
+      }
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${type == "jform" ? "J-Form Receipt" : "Procurement Bill"} PDF downloading...'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unable to open PDF download link: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -335,14 +374,15 @@ class _PaymentScreenState extends State<PaymentScreen> {
                 text: 'DOWNLOAD J-FORM RECEIPT (PDF)',
                 icon: Icons.download_rounded,
                 variant: ButtonVariant.outlined,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('J-Form Receipt downloaded to local documents.'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                },
+                onPressed: () => _downloadPdf('jform'),
+              ),
+              const SizedBox(height: 12),
+
+              CustomButton(
+                text: 'DOWNLOAD PROCUREMENT BILL (PDF)',
+                icon: Icons.receipt_long_rounded,
+                variant: ButtonVariant.outlined,
+                onPressed: () => _downloadPdf('bill'),
               ),
               const SizedBox(height: 12),
 

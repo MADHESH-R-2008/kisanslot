@@ -302,3 +302,45 @@ async def cancel_booking(
         "booking_id": booking_id,
         "status": booking.status.value,
     }
+
+
+from fastapi.responses import Response
+from services.pdf_service import generate_jform_pdf, generate_bill_pdf
+
+@router.get("/{booking_id}/pdf/jform")
+def download_jform_pdf(
+    booking_id: str,
+    db: Session = Depends(get_db),
+):
+    """Download Mandi J-Form PDF Receipt for a booking."""
+    booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+
+    pdf_bytes = generate_jform_pdf(booking)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=J-Form_{booking_id}.pdf"
+        },
+    )
+
+@router.get("/{booking_id}/pdf/bill")
+def download_bill_pdf(
+    booking_id: str,
+    db: Session = Depends(get_db),
+):
+    """Download Procurement Bill & Settlement PDF for a booking."""
+    booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found.")
+
+    pdf_bytes = generate_bill_pdf(booking)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=Procurement_Bill_{booking_id}.pdf"
+        },
+    )
