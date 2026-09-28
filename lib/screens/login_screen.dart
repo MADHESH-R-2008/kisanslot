@@ -18,7 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _isAdminLogin = false;
 
   @override
   void dispose() {
@@ -32,27 +31,10 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
 
       try {
-        if (_isAdminLogin) {
-          await ApiService.adminLogin(
-            username: _mobileController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-          if (!mounted) return;
-          setState(() => _isLoading = false);
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Welcome Admin!'),
-              backgroundColor: AppColors.success,
-              duration: Duration(seconds: 2),
-            ),
-          );
-          Navigator.pushReplacementNamed(context, '/admin/home');
-        } else {
-          final data = await ApiService.login(
-            mobile: _mobileController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+        final data = await ApiService.login(
+          mobile: _mobileController.text.trim(),
+          password: _passwordController.text.trim(),
+        );
 
           if (!mounted) return;
           setState(() => _isLoading = false);
@@ -68,7 +50,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         Navigator.pushReplacementNamed(context, AppRoutes.home);
-        }
       } on ApiException catch (e) {
         if (!mounted) return;
         setState(() => _isLoading = false);
@@ -141,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   Center(
                     child: Text(
-                      _isAdminLogin ? 'Admin Portal 🛡️' : 'Welcome Back 👋',
+                      'Welcome Back 👋',
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -163,54 +144,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // Role Toggle
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('Farmer'),
-                        selected: !_isAdminLogin,
-                        onSelected: (val) {
-                          if (val) setState(() => _isAdminLogin = false);
-                        },
-                      ),
-                      const SizedBox(width: 12),
-                      ChoiceChip(
-                        label: const Text('Admin / Operator'),
-                        selected: _isAdminLogin,
-                        onSelected: (val) {
-                          if (val) setState(() => _isAdminLogin = true);
-                        },
-                      ),
-                    ],
-                  ),
-                  
                   const SizedBox(height: 20),
 
                   // Mobile Number Field
                   Text(
-                    _isAdminLogin ? 'Username' : 'Mobile Number',
+                    'Mobile Number',
                     style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   TextFormField(
                     controller: _mobileController,
-                    keyboardType: _isAdminLogin ? TextInputType.text : TextInputType.phone,
-                    inputFormatters: _isAdminLogin ? [] : [
+                    keyboardType: TextInputType.phone,
+                    inputFormatters: [
                       FilteringTextInputFormatter.digitsOnly,
                       LengthLimitingTextInputFormatter(10),
                     ],
                     decoration: InputDecoration(
-                      hintText: _isAdminLogin ? 'Enter username' : 'Enter 10-digit mobile number',
-                      prefixIcon: Icon(_isAdminLogin ? Icons.admin_panel_settings : Icons.phone_android_rounded),
-                      prefixText: _isAdminLogin ? '' : '+91 ',
+                      hintText: 'Enter 10-digit mobile number',
+                      prefixIcon: const Icon(Icons.phone_android_rounded),
+                      prefixText: '+91 ',
                       prefixStyle: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
-                        return _isAdminLogin ? 'Please enter username' : 'Please enter mobile number';
+                        return 'Please enter mobile number';
                       }
-                      if (!_isAdminLogin && value.trim().length != 10) {
+                      if (value.trim().length != 10) {
                         return 'Mobile number must be 10 digits';
                       }
                       return null;
@@ -283,7 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
 
                   // Register prompt
-                  if (!_isAdminLogin) Row(
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       const Text(
