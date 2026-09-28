@@ -54,6 +54,7 @@ class OperatorPayload(BaseModel):
 
 class OperatorUpdate(BaseModel):
     full_name: Optional[str] = None
+    username: Optional[str] = None
     mobile: Optional[str] = None
     password: Optional[str] = Field(None, min_length=8)
 
@@ -224,7 +225,17 @@ def _operator_for_master(db: Session, master: AdminUser, operator_id: int) -> Ad
 @master_router.put("/operators/{operator_id}")
 def update_operator(operator_id: int, payload: OperatorUpdate, master: AdminUser = Depends(_master), db: Session = Depends(get_db)):
     user = _operator_for_master(db, master, operator_id)
-    for key, value in payload.model_dump(exclude_unset=True, exclude={"password"}).items(): setattr(user, key, value)
+    if payload.username is not None:
+        username = payload.username.strip()
+        if not username:
+            raise HTTPException(400, "Username cannot be empty")
+        duplicate = db.query(AdminUser.id).filter(
+            func.lower(AdminUser.username) == username.lower(), AdminUser.id != user.id
+        ).first()
+        if duplicate:
+            raise HTTPException(409, "Username already exists")
+        user.username = username
+    for key, value in payload.model_dump(exclude_unset=True, exclude={"password", "username"}).items(): setattr(user, key, value)
     if payload.password: user.password_hash = hash_password(payload.password)
     _audit(db, master, "UPDATE_OPERATOR", "OPERATOR", user.id); db.commit(); return _operator_dict(user)
 

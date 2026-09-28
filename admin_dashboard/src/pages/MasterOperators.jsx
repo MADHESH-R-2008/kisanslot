@@ -35,7 +35,7 @@ const OperatorFormModal = ({ operator, centres, onClose, onSave }) => {
     setError('');
     try {
       if (isEdit) {
-        const data = { full_name: form.full_name, mobile: form.mobile || null };
+        const data = { full_name: form.full_name, username: form.username, mobile: form.mobile || null };
         if (form.password) data.password = form.password;
         await masterAPI.updateOperator(operator.id, data);
       } else {
@@ -77,14 +77,12 @@ const OperatorFormModal = ({ operator, centres, onClose, onSave }) => {
             <input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
           </div>
 
-          {!isEdit && (
-            <div>
-              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
-                Username <span style={{ color: 'var(--danger-color)' }}>*</span>
-              </label>
-              <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
-            </div>
-          )}
+          <div>
+            <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
+              Username <span style={{ color: 'var(--danger-color)' }}>*</span>
+            </label>
+            <input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} required />
+          </div>
 
           <div>
             <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 500, marginBottom: '0.35rem', color: 'var(--text-secondary)' }}>
