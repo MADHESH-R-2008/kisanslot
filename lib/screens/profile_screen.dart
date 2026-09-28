@@ -88,14 +88,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Profile update API endpoint coming soon in Phase 3!'),
-                  backgroundColor: AppColors.primary,
-                ),
-              );
-              Navigator.pop(ctx);
+            onPressed: () async {
+              final name = nameCtrl.text.trim();
+              final village = villageCtrl.text.trim();
+              final district = districtCtrl.text.trim();
+              final state = stateCtrl.text.trim();
+              if (name.isEmpty || village.isEmpty || district.isEmpty || state.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Please complete all profile fields.')),
+                );
+                return;
+              }
+              try {
+                final updated = await ApiService.updateProfile(
+                  name: name,
+                  village: village,
+                  district: district,
+                  state: state,
+                );
+                if (!mounted) return;
+                setState(() => _farmer = FarmerModel.fromJson(updated));
+                Navigator.pop(ctx);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Profile updated successfully.'),
+                    backgroundColor: AppColors.success,
+                  ),
+                );
+              } on ApiException catch (e) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(e.message), backgroundColor: AppColors.error),
+                );
+              } catch (_) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Unable to update profile.'), backgroundColor: AppColors.error),
+                );
+              }
             },
             child: const Text('Save'),
           ),
