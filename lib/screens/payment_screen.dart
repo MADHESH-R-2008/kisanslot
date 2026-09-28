@@ -142,6 +142,25 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
     final booking = _booking!;
     final payStatus = _paymentData?['status'] ?? 'PENDING';
+    final String statusLabel;
+    final IconData statusIcon;
+    switch (payStatus.toString().toUpperCase()) {
+      case 'COMPLETED':
+        statusLabel = 'Paid';
+        statusIcon = Icons.check_circle;
+        break;
+      case 'PROCESSING':
+        statusLabel = 'Processing';
+        statusIcon = Icons.hourglass_top_rounded;
+        break;
+      case 'FAILED':
+        statusLabel = 'Failed';
+        statusIcon = Icons.error_outline_rounded;
+        break;
+      default:
+        statusLabel = 'Pending';
+        statusIcon = Icons.schedule_rounded;
+    }
     final currentStep = _getStepFromStatus(payStatus);
     
     final rate = (_procurementData?['rate'] ?? booking.ratePerKg).toDouble();
@@ -188,6 +207,13 @@ class _PaymentScreenState extends State<PaymentScreen> {
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh payment status',
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -239,10 +265,10 @@ class _PaymentScreenState extends State<PaymentScreen> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(payStatus == 'COMPLETED' ? Icons.check_circle : Icons.hourglass_top_rounded, size: 14, color: Colors.white),
+                              Icon(statusIcon, size: 14, color: Colors.white),
                               const SizedBox(width: 4),
                               Text(
-                                payStatus == 'COMPLETED' ? 'Completed' : 'Processing',
+                                statusLabel,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.bold,
