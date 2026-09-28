@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(width: 12),
                       ChoiceChip(
-                        label: const Text('Admin'),
+                        label: const Text('Admin / Operator'),
                         selected: _isAdminLogin,
                         onSelected: (val) {
                           if (val) setState(() => _isAdminLogin = true);
