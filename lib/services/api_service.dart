@@ -288,13 +288,15 @@ class ApiService {
   //  Slot APIs
   // ──────────────────────────────────────────────
 
-  /// Get available slots for a centre on a specific date.
   static Future<List<dynamic>> getSlots(int centreId, String date) async {
     final response = await http.get(
       Uri.parse('$baseUrl/api/centres/$centreId/slots?date=$date'),
       headers: await _authHeaders(),
     );
-    return _handleResponse(response);
+    final res = _handleResponse(response);
+    if (res is List) return res;
+    if (res is Map && res['items'] is List) return res['items'] as List<dynamic>;
+    return [];
   }
 
   // ──────────────────────────────────────────────
