@@ -117,7 +117,7 @@ def set_centre_status(
     admin: AdminUser = Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
-    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+    if admin.role not in [RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Administrator access required.")
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
     if not centre:
@@ -136,7 +136,7 @@ def create_centre(
     db: Session = Depends(get_db),
 ):
     """Admin or Master: create a centre and its Centre ID/password operator login."""
-    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+    if admin.role not in [RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to create centres")
 
     clean_code = payload.code.strip()
@@ -242,7 +242,7 @@ def delete_all_centres(
     db: Session = Depends(get_db),
 ):
     """Deprecated compatibility endpoint: deactivate centres without deleting history."""
-    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+    if admin.role not in [RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
     affected = db.query(Centre).filter(Centre.is_active.is_(True)).update({Centre.is_active: False}, synchronize_session=False)
@@ -257,7 +257,7 @@ def delete_centre(
     db: Session = Depends(get_db),
 ):
     """Deprecated compatibility endpoint: deactivate a centre and preserve history."""
-    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+    if admin.role not in [RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Admin or Master account required to delete centres")
 
     centre = db.query(Centre).filter(Centre.id == centre_id).first()

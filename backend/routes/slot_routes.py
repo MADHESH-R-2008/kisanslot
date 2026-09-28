@@ -235,7 +235,7 @@ def rollover_slots(
 ):
     """Close slots for past dates and open slots for the next 7 days for all active centres."""
     from datetime import date, timedelta, time
-    if admin.role not in [RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN]:
+    if admin.role not in [RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Admin access required.")
 
     try:

@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/admin", tags=["Administration"])
 
 
 def _is_system_admin(user: AdminUser) -> bool:
-    return user.role in (RoleEnum.ADMIN, RoleEnum.SUPER_ADMIN)
+    return user.role == RoleEnum.ADMIN
 
 
 def _require_system_admin(user: AdminUser) -> None:
@@ -325,4 +325,5 @@ def _analytics(admin: AdminUser, db: Session, requested_centre: Optional[int]):
 @router.get("/analytics/procurement")
 @router.get("/analytics/payments")
 def analytics(centre_id: Optional[int] = None, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
+    _require_system_admin(admin)
     return _analytics(admin, db, centre_id)

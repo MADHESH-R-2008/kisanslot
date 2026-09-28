@@ -48,7 +48,7 @@ def test_operator_centre_scope_and_admin_access(client):
     assert client.get("/api/queue/centre/2/status", headers=operator).status_code == 403
     assert client.get("/api/admin/operators", headers=operator).status_code == 403
     assert client.get("/api/admin/operators", headers=auth_header(2, "ADMIN")).status_code == 200
-    assert client.get("/api/admin/analytics/overview", headers=auth_header(3, "SUPER_ADMIN")).status_code == 200
+    assert client.get("/api/admin/analytics/overview", headers=auth_header(3, "SUPER_ADMIN")).status_code == 403
     assert client.get("/api/queue/centre/3/status", headers=auth_header(1, "CENTRE_OPERATOR", 1)).status_code == 401
 
 

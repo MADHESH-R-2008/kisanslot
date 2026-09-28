@@ -76,7 +76,7 @@ async def enforce_operator_centre(centre_id: int, user: dict = Depends(get_curre
 
 def require_admin_or_super():
     """Dependency that permits ADMIN, CENTRE_OPERATOR, or SUPER_ADMIN roles."""
-    return require_role([RoleEnum.ADMIN, RoleEnum.CENTRE_OPERATOR, RoleEnum.SUPER_ADMIN])
+    return require_role([RoleEnum.ADMIN, RoleEnum.CENTRE_OPERATOR, RoleEnum.MASTER])
 
 
 def require_super_admin():

@@ -50,7 +50,13 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
   // Role-based nav items
   const navItems = [];
 
-  if (role === 'MASTER') {
+  if (role === 'SUPER_ADMIN') {
+    // SUPER_ADMIN is deliberately limited to MASTER account management.
+    navItems.push(
+      { path: '/', label: 'Dashboard', icon: LayoutDashboard },
+      { path: '/masters', label: 'Masters', icon: Shield },
+    );
+  } else if (role === 'MASTER') {
     // MASTER-specific sidebar
     navItems.push(
       { path: '/',                 label: 'Dashboard',    icon: LayoutDashboard },
@@ -76,16 +82,10 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
       { path: '/reports',     label: 'Reports',         icon: BarChart2 },
     );
 
-    if (['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+    if (role === 'ADMIN') {
       navItems.push(
         { path: '/centres',   label: 'Centres',   icon: Building2 },
         { path: '/operators', label: 'Operators', icon: UserCog },
-      );
-    }
-
-    if (role === 'SUPER_ADMIN') {
-      navItems.push(
-        { path: '/masters', label: 'Masters', icon: Shield },
       );
     }
 
@@ -412,6 +412,7 @@ const Layout = ({ children }) => {
 const SmartDashboard = () => {
   const role = localStorage.getItem('role') || '';
   if (role === 'MASTER') return <MasterDashboard />;
+  if (role === 'SUPER_ADMIN') return <Masters />;
   return <Dashboard />;
 };
 
@@ -422,14 +423,14 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<PrivateRoute><Layout><SmartDashboard /></Layout></PrivateRoute>} />
-        <Route path="/queue" element={<PrivateRoute><Layout><Queue /></Layout></PrivateRoute>} />
-        <Route path="/bookings" element={<PrivateRoute><Layout><Bookings /></Layout></PrivateRoute>} />
-        <Route path="/procurement" element={<PrivateRoute><Layout><Procurement /></Layout></PrivateRoute>} />
-        <Route path="/payments" element={<PrivateRoute><Layout><Payments /></Layout></PrivateRoute>} />
-        <Route path="/farmers" element={<PrivateRoute><Layout><Farmers /></Layout></PrivateRoute>} />
-        <Route path="/notifications" element={<PrivateRoute><Layout><Notifications /></Layout></PrivateRoute>} />
-        <Route path="/settings" element={<PrivateRoute><Layout><Settings /></Layout></PrivateRoute>} />
-        <Route path="/reports" element={<PrivateRoute><Layout><Reports /></Layout></PrivateRoute>} />
+        <Route path="/queue" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Queue /></Layout></PrivateRoute>} />
+        <Route path="/bookings" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Bookings /></Layout></PrivateRoute>} />
+        <Route path="/procurement" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Procurement /></Layout></PrivateRoute>} />
+        <Route path="/payments" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Payments /></Layout></PrivateRoute>} />
+        <Route path="/farmers" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Farmers /></Layout></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Notifications /></Layout></PrivateRoute>} />
+        <Route path="/settings" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Settings /></Layout></PrivateRoute>} />
+        <Route path="/reports" element={<PrivateRoute requiredRoles={['ADMIN', 'MASTER', 'CENTRE_OPERATOR']}><Layout><Reports /></Layout></PrivateRoute>} />
 
         {/* MASTER routes */}
         <Route path="/master/centres" element={

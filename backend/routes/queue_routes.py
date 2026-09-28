@@ -196,7 +196,7 @@ def get_centre_queue_status(
     # Centre-level authorization
     if admin.role.value == "CENTRE_OPERATOR" and admin.centre_id != centre_id:
         raise HTTPException(status_code=403, detail="You are not authorized to access this centre's queue.")
-    if admin.role.value not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN"]:
+    if admin.role.value not in ["CENTRE_OPERATOR", "ADMIN", "MASTER"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     centre = db.query(Centre).filter(Centre.id == centre_id).first()
@@ -402,7 +402,7 @@ def get_queue_stats(
 
 @router.get("/admin/list", response_model=list[BookingDetailResponse])
 def get_admin_queue(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
-    if admin.role.value not in ["CENTRE_OPERATOR", "ADMIN", "SUPER_ADMIN", "admin"]:
+    if admin.role.value not in ["CENTRE_OPERATOR", "ADMIN", "MASTER", "admin"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     query = db.query(Booking).filter(
@@ -438,7 +438,7 @@ async def update_booking_status(booking_id: str, req: StatusUpdateRequest, admin
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN":
+    if booking.centre_id != admin.centre_id and admin.role.value not in ["ADMIN", "MASTER"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     booking.status = req.status
     db.commit()
@@ -738,7 +738,7 @@ async def mark_no_show(booking_id: str, admin: AdminUser = Depends(get_current_a
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
-    if booking.centre_id != admin.centre_id and admin.role.value != "SUPER_ADMIN":
+    if booking.centre_id != admin.centre_id and admin.role.value not in ["ADMIN", "MASTER"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     if booking.status != BookingStatusEnum.CALLED:
         raise HTTPException(status_code=409, detail="Only CALLED farmers can be marked as NO_SHOW.")

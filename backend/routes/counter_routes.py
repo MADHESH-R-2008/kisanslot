@@ -37,7 +37,7 @@ def _build_counter_response(counter, db) -> dict:
 def list_counters(admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     """List counters for the operator's assigned centre (or all for ADMIN/SUPER_ADMIN)."""
     centre_id = admin.centre_id
-    if not centre_id and admin.role.value in ["ADMIN", "SUPER_ADMIN"]:
+    if not centre_id and admin.role.value in ["ADMIN"]:
         # Admin/super can list all counters; optionally filter by query param
         counters = db.query(Counter).filter(Counter.is_deleted == False).all()
     elif centre_id:
@@ -91,7 +91,7 @@ def create_counter(req: CounterCreateRequest, admin: AdminUser = Depends(get_cur
 def update_counter(counter_id: int, req: CounterUpdateRequest, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     centre_id = admin.centre_id
     # Allow ADMIN/SUPER_ADMIN to update any counter
-    if admin.role.value in ["ADMIN", "SUPER_ADMIN"]:
+    if admin.role.value in ["ADMIN"]:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.is_deleted == False).first()
     else:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.centre_id == centre_id, Counter.is_deleted == False).first()
@@ -113,7 +113,7 @@ def update_counter(counter_id: int, req: CounterUpdateRequest, admin: AdminUser 
 def toggle_counter(counter_id: int, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     """Toggle counter between ACTIVE and INACTIVE."""
     centre_id = admin.centre_id
-    if admin.role.value in ["ADMIN", "SUPER_ADMIN"]:
+    if admin.role.value in ["ADMIN"]:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.is_deleted == False).first()
     else:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.centre_id == centre_id, Counter.is_deleted == False).first()
@@ -140,7 +140,7 @@ def toggle_counter(counter_id: int, admin: AdminUser = Depends(get_current_admin
 @router.delete("/{counter_id}")
 def delete_counter(counter_id: int, admin: AdminUser = Depends(get_current_admin), db: Session = Depends(get_db)):
     centre_id = admin.centre_id
-    if admin.role.value in ["ADMIN", "SUPER_ADMIN"]:
+    if admin.role.value in ["ADMIN"]:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.is_deleted == False).first()
     else:
         counter = db.query(Counter).filter(Counter.id == counter_id, Counter.centre_id == centre_id, Counter.is_deleted == False).first()
