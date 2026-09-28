@@ -7,7 +7,9 @@ import '../widgets/custom_button.dart';
 import '../widgets/status_card.dart';
 
 class ProcurementScreen extends StatefulWidget {
-  const ProcurementScreen({super.key});
+  final String? bookingId;
+
+  const ProcurementScreen({super.key, this.bookingId});
 
   @override
   State<ProcurementScreen> createState() => _ProcurementScreenState();
@@ -29,7 +31,7 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
     setState(() { _isLoading = true; _error = null; });
 
     try {
-      final bookingId = await ApiService.getActiveBookingId();
+      final bookingId = widget.bookingId ?? await ApiService.getActiveBookingId();
       if (bookingId == null || bookingId.isEmpty) {
         if (mounted) setState(() { _isLoading = false; _error = 'No active booking found.'; });
         return;
@@ -254,7 +256,11 @@ class _ProcurementScreenState extends State<ProcurementScreen> {
                 icon: Icons.payments_rounded,
                 variant: ButtonVariant.primary,
                 onPressed: () {
-                  Navigator.pushNamed(context, AppRoutes.payment);
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.payment,
+                    arguments: booking.bookingId,
+                  );
                 },
               ),
               const SizedBox(height: 20),

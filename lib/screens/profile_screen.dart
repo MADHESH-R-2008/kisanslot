@@ -179,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const Center(
                   child: Padding(
                     padding: EdgeInsets.all(32.0),
-                    child: Text('No active bookings found'),
+                    child: Text('No booking history found'),
                   ),
                 )
               else
@@ -188,7 +188,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     padding: const EdgeInsets.only(bottom: 14),
                     child: BookingCard(
                       booking: b,
-                      isCompact: true,
+                      queueLabel: 'Procurement',
+                      detailsLabel: 'Payment Bill',
+                      queueIcon: Icons.agriculture_outlined,
+                      detailsIcon: Icons.receipt_long_outlined,
+                      onTapQueue: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.procurement,
+                          arguments: b.bookingId,
+                        );
+                      },
+                      onTapDetails: () {
+                        Navigator.pop(ctx);
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.payment,
+                          arguments: b.bookingId,
+                        );
+                      },
                     ),
                   ),
                 ),

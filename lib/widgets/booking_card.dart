@@ -7,6 +7,10 @@ class BookingCard extends StatelessWidget {
   final VoidCallback? onTapQueue;
   final VoidCallback? onTapDetails;
   final bool isCompact;
+  final String queueLabel;
+  final String detailsLabel;
+  final IconData queueIcon;
+  final IconData detailsIcon;
 
   const BookingCard({
     super.key,
@@ -14,6 +18,10 @@ class BookingCard extends StatelessWidget {
     this.onTapQueue,
     this.onTapDetails,
     this.isCompact = false,
+    this.queueLabel = 'Live Queue',
+    this.detailsLabel = 'Details',
+    this.queueIcon = Icons.people_alt_outlined,
+    this.detailsIcon = Icons.receipt_long_outlined,
   });
 
   @override
@@ -167,8 +175,8 @@ class BookingCard extends StatelessWidget {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: onTapQueue,
-                            icon: const Icon(Icons.people_alt_outlined, size: 18),
-                            label: const Text('Live Queue'),
+                            icon: Icon(queueIcon, size: 18),
+                            label: Text(queueLabel),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
@@ -185,8 +193,8 @@ class BookingCard extends StatelessWidget {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: onTapDetails,
-                            icon: const Icon(Icons.receipt_long_outlined, size: 18),
-                            label: const Text('Details'),
+                            icon: Icon(detailsIcon, size: 18),
+                            label: Text(detailsLabel),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: const BorderSide(color: AppColors.primary),

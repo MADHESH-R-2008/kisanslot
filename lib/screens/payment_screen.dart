@@ -7,7 +7,9 @@ import '../widgets/custom_button.dart';
 import '../widgets/status_card.dart';
 
 class PaymentScreen extends StatefulWidget {
-  const PaymentScreen({super.key});
+  final String? bookingId;
+
+  const PaymentScreen({super.key, this.bookingId});
 
   @override
   State<PaymentScreen> createState() => _PaymentScreenState();
@@ -18,6 +20,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
   String? _error;
   BookingModel? _booking;
   Map<String, dynamic>? _paymentData;
+  Map<String, dynamic>? _procurementData;
 
   @override
   void initState() {
@@ -29,7 +32,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
     setState(() { _isLoading = true; _error = null; });
 
     try {
-      final bookingId = await ApiService.getActiveBookingId();
+      final bookingId = widget.bookingId ?? await ApiService.getActiveBookingId();
       if (bookingId == null || bookingId.isEmpty) {
         if (mounted) setState(() { _isLoading = false; _error = 'No active booking found.'; });
         return;
@@ -39,6 +42,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
       _booking = BookingModel.fromJson(bookingData);
 
       _paymentData = await ApiService.getPayment(bookingId);
+      try {
+        _procurementData = await ApiService.getProcurement(bookingId);
+      } catch (_) {
+        _procurementData = null;
+      }
 
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {
@@ -97,8 +105,8 @@ class _PaymentScreenState extends State<PaymentScreen> {
     final payStatus = _paymentData?['status'] ?? 'PENDING';
     final currentStep = _getStepFromStatus(payStatus);
     
-    final rate = booking.ratePerKg;
-    final qty = booking.quantityKg;
+    final rate = (_procurementData?['rate'] ?? booking.ratePerKg).toDouble();
+    final qty = (_procurementData?['actual_weight'] ?? booking.quantityKg).toDouble();
     final totalAmount = (_paymentData?['amount'] ?? (qty * rate)).toDouble();
     final transactionId = _paymentData?['transaction_id'];
 

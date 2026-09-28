@@ -1,4 +1,5 @@
 from datetime import date, time, datetime
+from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -9,6 +10,18 @@ from schemas import SlotResponse, SlotCreateRequest, SlotUpdateRequest
 from auth import get_current_admin
 
 router = APIRouter(prefix="/api", tags=["Slots"])
+INDIA_TZ = ZoneInfo("Asia/Kolkata")
+
+
+def _india_now() -> datetime:
+    return datetime.now(INDIA_TZ)
+
+
+def _is_slot_expired(slot: Slot, now: Optional[datetime] = None) -> bool:
+    current = now or _india_now()
+    return slot.date < current.date() or (
+        slot.date == current.date() and slot.end_time <= current.time().replace(tzinfo=None)
+    )
 
 
 def _parse_time(t_str: str) -> time:
@@ -36,7 +49,8 @@ def _format_time(t) -> str:
 
 def _build_slot_response(s: Slot) -> SlotResponse:
     available = max(0, s.capacity - (s.booked_count or 0))
-    if not s.is_active:
+    expired = _is_slot_expired(s)
+    if not s.is_active or expired:
         slot_status = "CLOSED"
     elif available <= 0:
         slot_status = "FULL"
@@ -54,7 +68,7 @@ def _build_slot_response(s: Slot) -> SlotResponse:
         booked_count=s.booked_count or 0,
         available=available,
         status=slot_status,
-        is_active=s.is_active and available > 0,
+        is_active=s.is_active and not expired and available > 0,
     )
 
 
@@ -110,6 +124,13 @@ def list_slots(
                 )
             except Exception:
                 db.rollback()
+
+    now = _india_now()
+    expired_slots = [slot for slot in slots if slot.is_active and _is_slot_expired(slot, now)]
+    if expired_slots:
+        for slot in expired_slots:
+            slot.is_active = False
+        db.commit()
 
     return [_build_slot_response(s) for s in slots]
 

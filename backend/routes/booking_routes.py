@@ -1,4 +1,5 @@
-from datetime import date, datetime
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -12,6 +13,7 @@ from services.booking_service import allocate_token_number, generate_booking_id,
 from services.notification_service import create_notification
 
 router = APIRouter(prefix="/api/bookings", tags=["Bookings"])
+INDIA_TZ = ZoneInfo("Asia/Kolkata")
 
 
 @router.post("", response_model=BookingResponse, status_code=status.HTTP_201_CREATED)
@@ -45,7 +47,12 @@ async def create_booking(
             detail="This slot does not belong to the selected centre.",
         )
 
-    if slot.date < date.today() or (slot.date == date.today() and slot.end_time <= datetime.now().time()):
+    now = datetime.now(INDIA_TZ)
+    local_time = now.time().replace(tzinfo=None)
+    if slot.date < now.date() or (slot.date == now.date() and slot.end_time <= local_time):
+        if slot.is_active:
+            slot.is_active = False
+            db.commit()
         raise HTTPException(status_code=400, detail="This slot has expired.")
 
     # 4. Atomically reserve capacity. The conditional UPDATE prevents overbooking.

@@ -67,9 +67,11 @@ class AppRoutes {
       case queue:
         return MaterialPageRoute(builder: (_) => const QueueScreen());
       case procurement:
-        return MaterialPageRoute(builder: (_) => const ProcurementScreen());
+        final bookingId = settings.arguments as String?;
+        return MaterialPageRoute(builder: (_) => ProcurementScreen(bookingId: bookingId));
       case payment:
-        return MaterialPageRoute(builder: (_) => const PaymentScreen());
+        final bookingId = settings.arguments as String?;
+        return MaterialPageRoute(builder: (_) => PaymentScreen(bookingId: bookingId));
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
       case notification:
