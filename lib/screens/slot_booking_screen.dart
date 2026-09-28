@@ -34,6 +34,7 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
   bool _isSlotsLoading = true;
   String? _slotsError;
   List<TimeSlot> _slots = [];
+  final Set<int> _bookedSlotIds = <int>{};
 
   final List<String> _crops = [
     'Paddy',
@@ -67,10 +68,29 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
       final rawList = await ApiService.getSlots(_centre.id, dateStr);
 
       _slots = rawList.map((json) => TimeSlot.fromJson(Map<String, dynamic>.from(json as Map))).toList();
-      // Auto-select first available slot
+      // Do not auto-select a slot already booked by this farmer on the date.
+      // This makes consecutive same-day bookings select the next hour instead
+      // of silently retrying the previous slot.
+      _bookedSlotIds.clear();
+      try {
+        final bookings = await ApiService.getMyBookings();
+        for (final item in bookings) {
+          final booking = Map<String, dynamic>.from(item as Map);
+          final bookingCentreId = int.tryParse(booking['centre_id']?.toString() ?? '');
+          if (bookingCentreId == _centre.id &&
+              booking['date']?.toString() == dateStr &&
+              booking['slot_id'] != null) {
+            _bookedSlotIds.add(int.tryParse(booking['slot_id'].toString()) ?? -1);
+          }
+        }
+      } catch (_) {
+        // Slot loading should still work if booking history is temporarily unavailable.
+      }
+
+      // Auto-select the first available slot not already booked.
       _selectedSlotId = null;
       for (final slot in _slots) {
-        if (slot.isAvailable) {
+        if (slot.isAvailable && !_bookedSlotIds.contains(slot.id)) {
           _selectedSlotId = slot.id;
           break;
         }

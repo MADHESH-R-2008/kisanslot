@@ -230,6 +230,7 @@ class BookingDetailResponse(BaseModel):
     quantity: float
     vehicle_number: str
     status: str
+    slot_id: Optional[int] = None
 
     class Config:
         from_attributes = True
