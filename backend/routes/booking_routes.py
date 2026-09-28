@@ -335,7 +335,7 @@ def download_bill_pdf(
     farmer: Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
 ):
-    """Download Procurement Bill & Settlement PDF for a booking."""
+    """Download the payment bill and DBT settlement PDF for a booking."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
@@ -347,6 +347,6 @@ def download_bill_pdf(
         content=pdf_bytes,
         media_type="application/pdf",
         headers={
-            "Content-Disposition": f"attachment; filename=Procurement_Bill_{booking_id}.pdf"
+            "Content-Disposition": f"attachment; filename=Payment_Bill_{booking_id}.pdf"
         },
     )

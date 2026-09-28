@@ -80,7 +80,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       final bytes = await ApiService.downloadBookingPdf(bId, type);
       final fileName = type == 'jform'
           ? 'J-Form_$bId.pdf'
-          : 'Procurement_Bill_$bId.pdf';
+          : 'Payment_Bill_$bId.pdf';
       await FlutterFileSaver().writeFileAsBytes(
         fileName: fileName,
         bytes: bytes,
@@ -88,7 +88,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${type == "jform" ? "J-Form Receipt" : "Procurement Bill"} saved successfully.'),
+            content: Text('${type == "jform" ? "J-Form Receipt" : "Payment Bill"} saved successfully.'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -379,7 +379,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
               const SizedBox(height: 12),
 
               CustomButton(
-                text: 'DOWNLOAD PROCUREMENT BILL (PDF)',
+                text: 'DOWNLOAD PAYMENT BILL (PDF)',
                 icon: Icons.receipt_long_rounded,
                 variant: ButtonVariant.outlined,
                 onPressed: () => _downloadPdf('bill'),
