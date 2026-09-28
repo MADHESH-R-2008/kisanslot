@@ -87,6 +87,10 @@ const Sidebar = ({ collapsed, setCollapsed }) => {
         { path: '/centres',   label: 'Centres',   icon: Building2 },
         { path: '/operators', label: 'Operators', icon: UserCog },
       );
+    } else if (role === 'CENTRE_OPERATOR') {
+      // Operators can manage slots for their assigned centre, but cannot
+      // create, edit, or delete centres.
+      navItems.push({ path: '/centres', label: 'Centre Slots', icon: Building2 });
     }
 
     navItems.push(
@@ -446,7 +450,7 @@ function App() {
 
         {/* ADMIN/SUPER_ADMIN routes */}
         <Route path="/centres" element={
-          <PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN']}>
+          <PrivateRoute requiredRoles={['ADMIN', 'SUPER_ADMIN', 'CENTRE_OPERATOR']}>
             <Layout><Centres /></Layout>
           </PrivateRoute>
         } />

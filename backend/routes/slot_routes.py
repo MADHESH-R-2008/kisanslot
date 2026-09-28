@@ -64,7 +64,7 @@ def list_slots(
     date: date = Query(..., description="Date in YYYY-MM-DD format"),
     db: Session = Depends(get_db),
 ):
-    """Return available slots for a given centre and date. Auto-generates standard slots if none exist."""
+    """Return hourly 09:00-18:00 slots, creating the daily schedule on first access."""
     slots = (
         db.query(Slot)
         .filter(
@@ -83,8 +83,11 @@ def list_slots(
                 (time(10, 0), time(11, 0)),
                 (time(11, 0), time(12, 0)),
                 (time(12, 0), time(13, 0)),
+                (time(13, 0), time(14, 0)),
                 (time(14, 0), time(15, 0)),
                 (time(15, 0), time(16, 0)),
+                (time(16, 0), time(17, 0)),
+                (time(17, 0), time(18, 0)),
             ]
             for start, end in slot_times:
                 s = Slot(
