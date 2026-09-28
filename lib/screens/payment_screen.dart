@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_file_saver/flutter_file_saver.dart';
 import '../models/booking.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -76,19 +76,19 @@ class _PaymentScreenState extends State<PaymentScreen> {
       return;
     }
 
-    final url = '${ApiService.baseUrl}/api/bookings/$bId/pdf/$type';
-    final uri = Uri.parse(url);
-
     try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        await launchUrl(uri, mode: LaunchMode.inAppWebView);
-      }
+      final bytes = await ApiService.downloadBookingPdf(bId, type);
+      final fileName = type == 'jform'
+          ? 'J-Form_$bId.pdf'
+          : 'Procurement_Bill_$bId.pdf';
+      await FlutterFileSaver().writeFileAsBytes(
+        fileName: fileName,
+        bytes: bytes,
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${type == "jform" ? "J-Form Receipt" : "Procurement Bill"} PDF downloading...'),
+            content: Text('${type == "jform" ? "J-Form Receipt" : "Procurement Bill"} saved successfully.'),
             backgroundColor: AppColors.success,
           ),
         );
@@ -97,7 +97,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Unable to open PDF download link: $e'),
+            content: Text('Unable to save PDF: $e'),
             backgroundColor: AppColors.error,
           ),
         );

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -358,6 +359,22 @@ class ApiService {
       headers: await _authHeaders(),
     );
     return _handleResponse(response);
+  }
+
+  /// Download a booking PDF using the app session instead of opening a browser.
+  static Future<Uint8List> downloadBookingPdf(String bookingId, String type) async {
+    if (type != 'jform' && type != 'bill') {
+      throw ApiException(400, 'Invalid PDF type.');
+    }
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/bookings/$bookingId/pdf/$type'),
+      headers: await _authHeaders(),
+    );
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return response.bodyBytes;
+    }
+    _handleResponse(response);
+    throw ApiException(response.statusCode, 'Unable to download PDF.');
   }
 
   /// Cancel a booking.

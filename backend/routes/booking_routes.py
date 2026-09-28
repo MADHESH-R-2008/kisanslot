@@ -310,12 +310,15 @@ from services.pdf_service import generate_jform_pdf, generate_bill_pdf
 @router.get("/{booking_id}/pdf/jform")
 def download_jform_pdf(
     booking_id: str,
+    farmer: Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
 ):
     """Download Mandi J-Form PDF Receipt for a booking."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
+    if booking.farmer_id != farmer.id:
+        raise HTTPException(status_code=403, detail="Not authorized.")
 
     pdf_bytes = generate_jform_pdf(booking)
     return Response(
@@ -329,12 +332,15 @@ def download_jform_pdf(
 @router.get("/{booking_id}/pdf/bill")
 def download_bill_pdf(
     booking_id: str,
+    farmer: Farmer = Depends(get_current_farmer),
     db: Session = Depends(get_db),
 ):
     """Download Procurement Bill & Settlement PDF for a booking."""
     booking = db.query(Booking).filter(Booking.booking_id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found.")
+    if booking.farmer_id != farmer.id:
+        raise HTTPException(status_code=403, detail="Not authorized.")
 
     pdf_bytes = generate_bill_pdf(booking)
     return Response(
