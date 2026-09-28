@@ -12,7 +12,8 @@ class JFormPDF(FPDF):
         self.cell(190, 8, 'KISAN SLOT - MANDI J-FORM (FORM J)', 0, 1, 'C')
         self.set_font('Helvetica', '', 10)
         self.cell(190, 6, 'Official Agricultural Produce Sale & Payment Receipt', 0, 1, 'C')
-        self.ln(6)
+        # Keep body content below the fixed header banner.
+        self.set_y(36)
 
     def footer(self):
         self.set_y(-20)
@@ -32,7 +33,8 @@ class PaymentBillPDF(FPDF):
         self.cell(190, 8, 'KISAN SLOT - PAYMENT BILL', 0, 1, 'C')
         self.set_font('Helvetica', '', 10)
         self.cell(190, 6, 'Procurement Settlement and DBT Payment Statement', 0, 1, 'C')
-        self.ln(7)
+        # Keep body content below the fixed header banner.
+        self.set_y(38)
 
     def footer(self):
         self.set_y(-18)
