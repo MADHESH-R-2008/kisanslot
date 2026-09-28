@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { superAdminAPI } from '../services/masterApi';
-import api from '../services/masterApi';
 import {
   Plus, Edit2, CheckCircle, XCircle, RefreshCw, Shield, MapPin, Users
 } from 'lucide-react';
@@ -134,35 +133,12 @@ const Masters = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const res = await superAdminAPI.listMasters();
-      setMasters(res.data);
-
-      // Fetch districts from the master list data
-      const districtMap = {};
-      res.data.forEach((m) => {
-        if (m.district_id && m.district) {
-          districtMap[m.district_id] = { id: m.district_id, name: m.district, code: `DIST-${m.district_id}` };
-        }
-      });
-      // Also fetch from centres API to get all districts
-      try {
-        const centresRes = await api.get('/centres/');
-        const centreData = Array.isArray(centresRes.data) ? centresRes.data : [];
-        centreData.forEach((c) => {
-          if (c.district && !Object.values(districtMap).find(d => d.name === c.district)) {
-            const id = Object.keys(districtMap).length + 1;
-            districtMap[id] = { id, name: c.district, code: `DIST-${id}` };
-          }
-        });
-      } catch { /* ignore */ }
-
-      // Fallback districts
-      if (Object.keys(districtMap).length === 0) {
-        for (let i = 1; i <= 3; i++) {
-          districtMap[i] = { id: i, name: `District ${i}`, code: `DIST-${i}` };
-        }
-      }
-      setDistricts(Object.values(districtMap));
+      const [mastersRes, districtsRes] = await Promise.all([
+        superAdminAPI.listMasters(),
+        superAdminAPI.listDistricts(),
+      ]);
+      setMasters(mastersRes.data);
+      setDistricts(districtsRes.data);
       setError('');
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to load masters');

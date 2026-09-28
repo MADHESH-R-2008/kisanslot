@@ -14,8 +14,8 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _mobileController = TextEditingController(text: '9876543210');
-  final _passwordController = TextEditingController(text: '123456');
+  final _mobileController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
   bool _isAdminLogin = false;
@@ -91,25 +91,6 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     }
-  }
-
-  void _fillDemoCredentials() {
-    setState(() {
-      if (_isAdminLogin) {
-        _mobileController.text = 'admin';
-        _passwordController.text = 'admin123';
-      } else {
-        _mobileController.text = '9876543210';
-        _passwordController.text = '123456';
-      }
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Demo credentials loaded (Ravi Kumar)'),
-        backgroundColor: AppColors.info,
-        duration: Duration(seconds: 1),
-      ),
-    );
   }
 
   @override
@@ -205,25 +186,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   
                   const SizedBox(height: 20),
-
-                  // Quick Demo Autofill chip
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _fillDemoCredentials,
-                      icon: const Icon(Icons.flash_on, size: 16, color: AppColors.secondaryDark),
-                      label: const Text(
-                        'Fill Demo Credentials',
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.secondaryDark),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        backgroundColor: AppColors.secondaryContainer,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
 
                   // Mobile Number Field
                   Text(

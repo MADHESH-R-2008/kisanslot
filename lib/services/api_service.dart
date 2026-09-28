@@ -284,6 +284,17 @@ class ApiService {
     return _handleResponse(response);
   }
 
+  /// Fetches the active districts used by the farmer registration selector.
+  static Future<List<Map<String, dynamic>>> getDistricts() async {
+    final response = await http.get(
+      Uri.parse('$baseUrl/api/centres/districts'),
+      headers: await _authHeaders(),
+    ).timeout(const Duration(seconds: 15));
+    final data = _handleResponse(response);
+    if (data is! List) return <Map<String, dynamic>>[];
+    return data.map((item) => Map<String, dynamic>.from(item as Map)).toList();
+  }
+
   // ──────────────────────────────────────────────
   //  Slot APIs
   // ──────────────────────────────────────────────

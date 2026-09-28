@@ -50,8 +50,8 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
     _centre = widget.selectedCentre;
     _selectedDate = DateTime.now();
     _selectedCrop = 'Paddy';
-    _quantityController = TextEditingController(text: '850');
-    _vehicleController = TextEditingController(text: 'TN 01 AB 1234');
+    _quantityController = TextEditingController();
+    _vehicleController = TextEditingController();
 
     _loadSlots();
   }
@@ -67,8 +67,6 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
       final rawList = await ApiService.getSlots(_centre.id, dateStr);
 
       _slots = rawList.map((json) => TimeSlot.fromJson(Map<String, dynamic>.from(json as Map))).toList();
-      if (_slots.isEmpty) _slots = TimeSlot.getMockSlots();
-
       // Auto-select first available slot
       _selectedSlotId = null;
       for (final slot in _slots) {
@@ -82,10 +80,9 @@ class _SlotBookingScreenState extends State<SlotBookingScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _slots = TimeSlot.getMockSlots();
-          _selectedSlotId = _slots.firstWhere((s) => s.isAvailable, orElse: () => _slots.first).id;
+          _slots = [];
           _isSlotsLoading = false;
-          _slotsError = null;
+          _slotsError = 'Unable to load available slots. Please try again.';
         });
       }
 

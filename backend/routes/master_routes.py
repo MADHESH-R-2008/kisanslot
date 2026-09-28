@@ -278,6 +278,13 @@ def list_masters(_: AdminUser = Depends(_super), db: Session = Depends(get_db)):
     return [_master_dict(u) for u in db.query(AdminUser).filter(AdminUser.role == RoleEnum.MASTER).order_by(AdminUser.created_at.desc()).all()]
 
 
+@super_router.get("/districts")
+def list_districts(_: AdminUser = Depends(_super), db: Session = Depends(get_db)):
+    """Return the configured Tamil Nadu districts for MASTER assignment."""
+    return [{"id": d.id, "name": d.name, "code": d.code, "state": d.state, "status": d.status}
+            for d in db.query(District).order_by(District.name).all()]
+
+
 @super_router.post("/masters", status_code=201)
 def create_master(payload: MasterPayload, super_admin: AdminUser = Depends(_super), db: Session = Depends(get_db)):
     district = db.query(District).filter(District.id == payload.district_id).first()

@@ -52,6 +52,7 @@ export const masterAPI = {
 // ── Super Admin Master Management ─────────────────────────────────────────────
 export const superAdminAPI = {
   listMasters: () => api.get('/super-admin/masters'),
+  listDistricts: () => api.get('/super-admin/districts'),
   createMaster: (data) => api.post('/super-admin/masters', data),
   getMaster: (id) => api.get(`/super-admin/masters/${id}`),
   updateMaster: (id, data) => api.put(`/super-admin/masters/${id}`, data),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import '../models/centre.dart';
 import '../services/api_service.dart';
 import '../utils/app_colors.dart';
@@ -20,6 +21,7 @@ class _CentreScreenState extends State<CentreScreen> {
   List<ProcurementCentre> _centres = [];
   bool _isLoading = true;
   String? _error;
+  bool _locationUnavailable = false;
 
   @override
   void initState() {
@@ -39,7 +41,11 @@ class _CentreScreenState extends State<CentreScreen> {
     }
 
     try {
-      final data = await ApiService.getCentres();
+      final position = await _getUserPosition();
+      final data = await ApiService.getCentres(
+        lat: position?.latitude,
+        lon: position?.longitude,
+      );
       final List rawList = data is List
           ? data
           : (data is Map && data['items'] is List ? data['items'] as List : []);
@@ -54,6 +60,7 @@ class _CentreScreenState extends State<CentreScreen> {
         // production has no configured procurement centres.
         _centres = loaded;
         _isLoading = false;
+        _locationUnavailable = position == null;
         _error = loaded.isEmpty ? 'No procurement centres are available yet.' : null;
       });
     } catch (e) {
@@ -62,10 +69,40 @@ class _CentreScreenState extends State<CentreScreen> {
       setState(() {
         _centres = [];
         _isLoading = false;
+        _locationUnavailable = true;
         _error = 'Unable to load procurement centres. Please try again.';
       });
     }
 
+  }
+
+  /// Returns the phone's current position when location is available and
+  /// permission has been granted. A null result is safe: the API still loads
+  /// centres, but cannot calculate distance from the user's device.
+  Future<Position?> _getUserPosition() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) return null;
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 25,
+        ),
+        timeLimit: const Duration(seconds: 8),
+      );
+    } catch (e) {
+      debugPrint('Unable to obtain current location: $e');
+      return null;
+    }
   }
 
   List<ProcurementCentre> get _filteredCentres {
@@ -130,6 +167,17 @@ class _CentreScreenState extends State<CentreScreen> {
                       _buildFilterChip('Shortest Queue'),
                     ],
                   ),
+                  if (_locationUnavailable)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Enable phone location to see distance from your current position.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 12),
 
                   // ── Count header ─────────────────────────────────────────

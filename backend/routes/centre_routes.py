@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from auth import hash_password
 from database import get_db
 from dependencies import enforce_operator_centre, get_current_admin, require_admin_or_super
-from models import AdminUser, Booking, Centre, Counter, Payment, Procurement, RoleEnum, Slot
+from models import AdminUser, Booking, Centre, Counter, District, Payment, Procurement, RoleEnum, Slot
 from schemas import CentreCreateRequest, CentreResponse, CentreUpdateRequest
 
 router = APIRouter(prefix="/api/centres", tags=["Centres"])
@@ -17,6 +17,15 @@ router = APIRouter(prefix="/api/centres", tags=["Centres"])
 
 class CentreStatusRequest(BaseModel):
     is_active: bool
+
+
+@router.get("/districts")
+def list_public_districts(db: Session = Depends(get_db)):
+    """Return active districts for farmer registration."""
+    return [{"id": d.id, "name": d.name, "code": d.code, "state": d.state}
+            for d in db.query(District)
+            .filter(District.status == "ACTIVE", District.code != "TN")
+            .order_by(District.name).all()]
 
 
 import math

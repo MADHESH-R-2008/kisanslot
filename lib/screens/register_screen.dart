@@ -21,7 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _villageController = TextEditingController();
   final _districtController = TextEditingController();
   final _stateController = TextEditingController();
-  final _quantityController = TextEditingController(text: '850');
+  final _quantityController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -37,6 +37,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  List<Map<String, dynamic>> _districts = [];
+  String? _selectedDistrict;
+  final List<String> _states = const ['Tamil Nadu'];
+  String? _selectedState = 'Tamil Nadu';
+
+  @override
+  void initState() {
+    super.initState();
+    _stateController.text = _selectedState!;
+    _loadDistricts();
+  }
+
+  Future<void> _loadDistricts() async {
+    try {
+      final districts = await ApiService.getDistricts();
+      if (!mounted) return;
+      setState(() => _districts = districts);
+    } catch (e) {
+      debugPrint('Unable to load districts: $e');
+    }
+  }
 
   @override
   void dispose() {
@@ -231,13 +252,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildFieldLabel('District *'),
-                          TextFormField(
-                            controller: _districtController,
+                          DropdownButtonFormField<String>(
+                            value: _selectedDistrict,
+                            isExpanded: true,
                             decoration: const InputDecoration(
-                              hintText: 'District',
+                              hintText: 'Select district',
                               prefixIcon: Icon(Icons.location_city_outlined),
                             ),
-                            validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                            items: _districts.map((district) {
+                              final name = district['name']?.toString() ?? '';
+                              return DropdownMenuItem(value: name, child: Text(name));
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedDistrict = value;
+                                _districtController.text = value ?? '';
+                              });
+                            },
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                           ),
                         ],
                       ),
@@ -248,13 +280,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _buildFieldLabel('State *'),
-                          TextFormField(
-                            controller: _stateController,
+                          DropdownButtonFormField<String>(
+                            value: _selectedState,
+                            isExpanded: true,
                             decoration: const InputDecoration(
-                              hintText: 'State',
+                              hintText: 'Select state',
                               prefixIcon: Icon(Icons.map_outlined),
                             ),
-                            validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                            items: _states.map((state) => DropdownMenuItem(
+                              value: state,
+                              child: Text(state),
+                            )).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedState = value;
+                                _stateController.text = value ?? '';
+                              });
+                            },
+                            validator: (value) => value == null || value.isEmpty ? 'Required' : null,
                           ),
                         ],
                       ),
