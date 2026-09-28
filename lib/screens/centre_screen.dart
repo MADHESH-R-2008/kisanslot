@@ -50,17 +50,19 @@ class _CentreScreenState extends State<CentreScreen> {
 
       if (!mounted) return;
       setState(() {
-        _centres = loaded.isNotEmpty ? loaded : ProcurementCentre.getMockCentres();
+        // The API is the only source of truth. Never show demo centres when
+        // production has no configured procurement centres.
+        _centres = loaded;
         _isLoading = false;
-        _error = null;
+        _error = loaded.isEmpty ? 'No procurement centres are available yet.' : null;
       });
     } catch (e) {
       debugPrint('Error loading centres from API: $e');
       if (!mounted) return;
       setState(() {
-        _centres = ProcurementCentre.getMockCentres();
+        _centres = [];
         _isLoading = false;
-        _error = null;
+        _error = 'Unable to load procurement centres. Please try again.';
       });
     }
 
