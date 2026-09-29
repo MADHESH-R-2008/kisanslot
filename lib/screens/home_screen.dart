@@ -72,7 +72,7 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
   }
 
-  Future<void> _loadData() async {
+  Future<void> _loadData({bool allowRefresh = true}) async {
     setState(() {
       _isLoading = true;
       _error = null;
@@ -121,7 +121,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _isLoading = false);
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
-        // Token expired
+        if (allowRefresh && await ApiService.refreshSession()) {
+          await _loadData(allowRefresh: false);
+          return;
+        }
         await ApiService.clearToken();
         if (mounted) {
           Navigator.pushReplacementNamed(context, AppRoutes.login);

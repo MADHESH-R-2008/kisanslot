@@ -28,8 +28,13 @@ class FarmerLoginRequest(BaseModel):
 
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     farmer: "FarmerBrief"
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str = Field(..., min_length=20)
 
 
 class AdminLoginRequest(BaseModel):

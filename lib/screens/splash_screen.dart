@@ -56,8 +56,23 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
             Navigator.pushReplacementNamed(context, AppRoutes.home);
             return;
           }
-        } catch (_) {
+        } on ApiException catch (e) {
+          if (e.statusCode == 401 && await ApiService.refreshSession()) {
+            try {
+              await ApiService.getProfile().timeout(const Duration(seconds: 3));
+              if (mounted) {
+                Navigator.pushReplacementNamed(context, AppRoutes.home);
+                return;
+              }
+            } catch (_) {}
+          }
           await ApiService.clearToken();
+        } catch (_) {
+          // A temporary network problem must not destroy a valid session.
+          if (mounted) {
+            Navigator.pushReplacementNamed(context, AppRoutes.home);
+            return;
+          }
         }
       }
     } catch (_) {}

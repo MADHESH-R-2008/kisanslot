@@ -34,8 +34,26 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     """Create a JWT token."""
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "type": "access"})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def create_refresh_token(data: dict) -> str:
+    """Create a farmer refresh token valid for 30 days."""
+    to_encode = data.copy()
+    to_encode.update({"exp": datetime.utcnow() + timedelta(days=30), "type": "refresh"})
+    return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+
+
+def decode_refresh_token(token: str) -> dict:
+    """Validate and return claims from a farmer refresh token."""
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Session expired. Please login again.")
+    if payload.get("type") != "refresh" or payload.get("role") != "FARMER" or payload.get("sub") is None:
+        raise HTTPException(status_code=401, detail="Invalid refresh token.")
+    return payload
 
 
 def get_current_farmer(
@@ -51,6 +69,8 @@ def get_current_farmer(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type", "access") != "access":
+            raise credentials_exception
         farmer_id: Optional[int] = payload.get("sub")
         role: Optional[str] = payload.get("role")
         if farmer_id is None or role != "FARMER":
@@ -78,6 +98,8 @@ def get_current_admin(
 
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        if payload.get("type", "access") != "access":
+            raise credentials_exception
         admin_id: Optional[int] = payload.get("sub")
         role: Optional[str] = payload.get("role")
         token_centre_id: Optional[int] = payload.get("centre_id")

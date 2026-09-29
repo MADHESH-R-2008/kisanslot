@@ -8,11 +8,24 @@ from database import get_db
 from models import Farmer, AdminUser
 from schemas import (
     FarmerRegisterRequest, FarmerLoginRequest, TokenResponse, FarmerBrief,
-    AdminLoginRequest, AdminTokenResponse, MasterPasswordResetRequest
+    AdminLoginRequest, AdminTokenResponse, MasterPasswordResetRequest,
+    RefreshTokenRequest,
 )
-from auth import hash_password, verify_password, create_access_token, get_current_master_admin
+from auth import (
+    hash_password, verify_password, create_access_token, create_refresh_token,
+    decode_refresh_token, get_current_master_admin,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["Authentication"])
+
+
+def _farmer_tokens(farmer: Farmer) -> TokenResponse:
+    claims = {"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None}
+    return TokenResponse(
+        access_token=create_access_token(data=claims),
+        refresh_token=create_refresh_token(data=claims),
+        farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id),
+    )
 
 
 @router.get("/init-db", tags=["System"])
@@ -66,12 +79,7 @@ def register(req: FarmerRegisterRequest, db: Session = Depends(get_db)):
     db.refresh(farmer)
 
     # Generate JWT
-    token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
-
-    return TokenResponse(
-        access_token=token,
-        farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id),
-    )
+    return _farmer_tokens(farmer)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -91,12 +99,17 @@ def login(req: FarmerLoginRequest, db: Session = Depends(get_db)):
             detail="Invalid password. Please try again.",
         )
 
-    token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
+    return _farmer_tokens(farmer)
 
-    return TokenResponse(
-        access_token=token,
-        farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id),
-    )
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh_farmer_session(req: RefreshTokenRequest, db: Session = Depends(get_db)):
+    """Issue a new access/refresh pair for an existing farmer session."""
+    payload = decode_refresh_token(req.refresh_token)
+    farmer = db.query(Farmer).filter(Farmer.id == int(payload["sub"])).first()
+    if not farmer:
+        raise HTTPException(status_code=401, detail="Farmer account no longer exists.")
+    return _farmer_tokens(farmer)
 
 
 @router.post("/admin/login", response_model=AdminTokenResponse)
@@ -151,8 +164,7 @@ def unified_login(req: UnifiedLoginRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No farmer account found with this mobile number.")
         if not verify_password(req.password, farmer.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid password for farmer account.")
-        token = create_access_token(data={"sub": str(farmer.id), "user_id": farmer.id, "role": "FARMER", "centre_id": None})
-        return TokenResponse(access_token=token, farmer=FarmerBrief(id=farmer.id, name=farmer.name, farmer_id=farmer.farmer_id))
+        return _farmer_tokens(farmer)
     elif req.username:
         clean_username = req.username.strip()
         admin = db.query(AdminUser).filter(func.lower(AdminUser.username) == func.lower(clean_username)).first()

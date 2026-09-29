@@ -21,6 +21,7 @@ class ApiService {
 
   static const _storage = FlutterSecureStorage();
   static const _tokenKey = 'jwt_token';
+  static const _refreshTokenKey = 'refresh_token';
   static const _farmerIdKey = 'farmer_id';
   static const _farmerNameKey = 'farmer_name';
   static const _farmerFarmerId = 'farmer_farmer_id';
@@ -173,6 +174,9 @@ class ApiService {
 
     // Store token and farmer info
     await saveToken(data['access_token']);
+    if (data['refresh_token'] != null) {
+      await saveRefreshToken(data['refresh_token']);
+    }
     final farmer = data['farmer'];
     await saveFarmerInfo(farmer['id'], farmer['name'], farmer['farmer_id']);
 
@@ -197,10 +201,36 @@ class ApiService {
 
     // Store token and farmer info
     await saveToken(data['access_token']);
+    if (data['refresh_token'] != null) {
+      await saveRefreshToken(data['refresh_token']);
+    }
     final farmer = data['farmer'];
     await saveFarmerInfo(farmer['id'], farmer['name'], farmer['farmer_id']);
 
     return data;
+  }
+
+  /// Renew an expired farmer session without asking for the password again.
+  static Future<bool> refreshSession() async {
+    final refreshToken = await getRefreshToken();
+    if (refreshToken == null || refreshToken.isEmpty) return false;
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/auth/refresh'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'refresh_token': refreshToken}),
+      );
+      final data = _handleResponse(response);
+      await saveToken(data['access_token']);
+      if (data['refresh_token'] != null) {
+        await saveRefreshToken(data['refresh_token']);
+      }
+      final farmer = data['farmer'];
+      await saveFarmerInfo(farmer['id'], farmer['name'], farmer['farmer_id']);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Login as Admin.
@@ -283,6 +313,20 @@ class ApiService {
       headers: await _authHeaders(),
     ).timeout(const Duration(seconds: 15));
     return _handleResponse(response);
+  }
+
+  static Future<void> saveRefreshToken(String token) async {
+    try {
+      await _storage.write(key: _refreshTokenKey, value: token);
+    } catch (_) {}
+  }
+
+  static Future<String?> getRefreshToken() async {
+    try {
+      return await _storage.read(key: _refreshTokenKey);
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Fetches the active districts used by the farmer registration selector.
